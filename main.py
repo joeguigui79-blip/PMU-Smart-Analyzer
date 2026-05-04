@@ -2,14 +2,16 @@ import logging
 import os
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.database import init_db
 from app.routers import courses, dashboard
 from app.routers import bets as bets_router
 from app.routers import scoring as scoring_router
+from app.routers import auth_router
+from app.auth import validate_token, get_token_from_request
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,7 +56,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ---- Auth middleware — protects all /api/* except /api/login ----
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    # Always allow: login endpoint, static files, manifest, SW, root HTML
+    if (
+        path == "/api/login"
+        or path == "/api/logout"
+        or not path.startswith("/api/")
+    ):
+        return await call_next(request)
+    # Protected API route → validate token
+    token = get_token_from_request(request)
+    try:
+        validate_token(token)
+    except Exception:
+        return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
+    return await call_next(request)
+
 # Routers API
+app.include_router(auth_router.router)
 app.include_router(courses.router)
 app.include_router(dashboard.router)
 app.include_router(bets_router.router)

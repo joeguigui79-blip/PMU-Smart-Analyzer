@@ -951,7 +951,7 @@ window.onerror = function (msg, src, line, col, err) {
   if (!navigator.onLine) setOfflineBanner(true);
 })();
 
-document.addEventListener("DOMContentLoaded", function () {
+function _appInit() {
   try {
     document.querySelectorAll(".nav-item").forEach(function (item) {
       item.addEventListener("click", function () { navigate(item.dataset.nav); });
@@ -983,6 +983,18 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("dashboard-content").innerHTML =
       "<div class='empty-state'><div class='empty-icon'>⚠️</div><div class='empty-title'>Erreur d'initialisation</div><p style='color:var(--text-muted);font-size:13px'>" + err.message + "</p></div>";
   }
+}
+
+// Expose so auth.js can call it after login
+window._appInit = _appInit;
+
+document.addEventListener("DOMContentLoaded", function () {
+  // Check authentication before starting the app
+  if (window.Auth && window.Auth.boot) {
+    var hasToken = window.Auth.boot();
+    if (!hasToken) return; // login screen shown by boot()
+  }
+  _appInit();
 });
 
 window.showCourse = showCourse;

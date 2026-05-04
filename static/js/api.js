@@ -3,8 +3,21 @@ const BASE = "";
 
 async function apiFetch(path, options) {
   options = options || {};
+  // Inject auth token into every request
+  var token = window.Auth && window.Auth.getToken ? window.Auth.getToken() : null;
+  if (token) {
+    options.headers = options.headers || {};
+    options.headers["Authorization"] = "Bearer " + token;
+  }
   try {
     const res = await fetch(BASE + path, options);
+    if (res.status === 401) {
+      // Token expired / invalid → show login screen
+      if (window.Auth && window.Auth.showLoginScreen) {
+        window.Auth.showLoginScreen("Session expirée. Reconnectez-vous.");
+      }
+      throw new Error("HTTP 401");
+    }
     if (!res.ok) throw new Error("HTTP " + res.status);
     return await res.json();
   } catch (e) {
