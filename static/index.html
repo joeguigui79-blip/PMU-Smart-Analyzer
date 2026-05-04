@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>PMU Smart Analyzer</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/css/style.css?v=5">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============================
+         PAGE: DASHBOARD
+         ============================ -->
+    <div id="page-dashboard" class="page active">
+      <div class="top-header">
+        <div class="logo">PMU<span>Smart</span></div>
+        <span class="date-badge">—</span>
+        <button class="refresh-btn" onclick="doRefresh()" title="Rafraîchir">↺</button>
+      </div>
+      <div id="dashboard-content">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- ============================
+         PAGE: COURSES LIST
+         ============================ -->
+    <div id="page-courses" class="page">
+      <div class="top-header">
+        <div class="logo">PMU<span>Smart</span></div>
+        <span class="date-badge">—</span>
+        <button class="refresh-btn" onclick="doRefresh()">↺</button>
+      </div>
+      <div id="courses-content">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- ============================
+         PAGE: COURSE DETAIL
+         ============================ -->
+    <div id="page-course" class="page">
+      <div class="top-header">
+        <button class="back-btn" id="page-course-back-btn" style="display:none">‹</button>
+        <span class="header-title" id="course-header-title">Course</span>
+        <span class="date-badge">—</span>
+      </div>
+      <div id="course-content">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- ============================
+         PAGE: MES PARIS
+         ============================ -->
+    <div id="page-bets" class="page">
+      <div class="top-header">
+        <div class="logo">PMU<span>Smart</span></div>
+        <span class="date-badge">—</span>
+      </div>
+      <div id="bets-content">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- ============================
+         BOTTOM NAVIGATION
+         ============================ -->
+    <nav class="bottom-nav">
+      <div class="nav-item active" data-nav="dashboard">
+        <span class="nav-icon">📊<span id="alert-badge" class="nav-badge" style="display:none">0</span></span>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item" data-nav="courses">
+        <span class="nav-icon">🏇</span>
+        <span>Courses</span>
+      </div>
+      <div class="nav-item" data-nav="bets">
+        <span class="nav-icon">🎯</span>
+        <span>Mes Paris</span>
+      </div>
+    </nav>
+
+    <!-- ============================
+         PARTICIPANT MODAL
+         ============================ -->
+    <div id="modal-overlay" class="modal-overlay">
+      <div class="modal">
+        <div id="modal-body"><!-- Filled by JS --></div>
+      </div>
+    </div>
+
+    <!-- ============================
+         TOAST
+         ============================ -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Pull-to-refresh indicator -->
+    <div id="ptr-indicator" class="ptr-indicator">
+      <div class="ptr-spinner"></div>
+    </div>
+
+  </div><!-- #app -->
+
+  <script src="/static/js/api.js?v=3"></script>
+  <script src="/static/js/components.js?v=3"></script>
+  <script src="/static/js/bets.js?v=3"></script>
+  <script src="/static/js/app.js?v=6"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/sw.js")
+          .then(function (reg) { console.log("[PWA] SW enregistré, scope:", reg.scope); })
+          .catch(function (err) { console.warn("[PWA] SW échec:", err); });
+      });
+    }
+  </script>
+</body>
+</html>
