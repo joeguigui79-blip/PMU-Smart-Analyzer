@@ -219,67 +219,63 @@ class PMUClient:
         self, date_str: str, reunion_num: int, course_num: int
     ) -> list[dict] | None:
         """
-        Extrait ordreArrivee depuis le programme du jour.
-        ordreArrivee est une liste de listes [[num_pmu], ...] indexée par position.
+        Extrait ordreArrivee depuis le programme du jour ou l'endpoint participants.
         """
+        # Cas 1 : chercher dans le programme global (fonctionne pour la R1 / plat)
         url = f"{PMU_BASE_URL}/{date_str}"
         try:
             resp = await self._client.get(url)
             resp.raise_for_status()
             data = resp.json()
+            programme = data.get("programme", data)
+            for r in programme.get("reunions", []):
+                if r.get("numOfficiel") != reunion_num:
+                    continue
+                for c in r.get("courses", []):
+                    if c.get("numExterne") != course_num:
+                        continue
+                    ordre = c.get("ordreArrivee")
+                    if isinstance(ordre, list) and ordre:
+                        result = []
+                        for position, item in enumerate(ordre, start=1):
+                            if isinstance(item, list):
+                                num = item[0] if item else None
+                            else:
+                                num = item
+                            if num is not None:
+                                try:
+                                    result.append({"numero_cheval": int(num), "position": position})
+                                except (ValueError, TypeError):
+                                    pass
+                        if result:
+                            return result
         except Exception as e:
             logger.warning("PMU programme (arrivee) error: %s", e)
-            return None
 
-        programme = data.get("programme", data)
-        for r in programme.get("reunions", []):
-            if r.get("numOfficiel") != reunion_num:
-                continue
-            for c in r.get("courses", []):
-                if c.get("numExterne") != course_num:
-                    continue
-                ordre = c.get("ordreArrivee")
-                # Cas 1 : PLAT — ordreArrivee est une liste au niveau course
-                if isinstance(ordre, list) and ordre:
-                    result = []
-                    for position, item in enumerate(ordre, start=1):
-                        # item peut être [num_pmu] ou juste num_pmu
-                        if isinstance(item, list):
-                            num = item[0] if item else None
-                        else:
-                            num = item
-                        if num is not None:
-                            try:
-                                result.append({"numero_cheval": int(num), "position": position})
-                            except (ValueError, TypeError):
-                                pass
-                    return result if result else None
-                # Cas 2 : TROT — ordreArrivee est un entier par participant
-                # L'endpoint /programme retourne participants=[] ; appel à l'endpoint dédié
-                participants_url = PMU_PARTICIPANTS_URL.format(
-                    date=date_str, reunion=reunion_num, course=course_num
-                )
+        # Cas 2 : fallback — appel direct à l'endpoint participants (trot et réunions non incluses dans /programme)
+        participants_url = PMU_PARTICIPANTS_URL.format(
+            date=date_str, reunion=reunion_num, course=course_num
+        )
+        try:
+            resp2 = await self._client.get(participants_url)
+            resp2.raise_for_status()
+            p_data = resp2.json()
+        except Exception as e:
+            logger.warning("PMU participants (arrivee fallback) error: %s", e)
+            return None
+        p_list = p_data if isinstance(p_data, list) else p_data.get("participants", [])
+        result = []
+        for p in p_list:
+            ordre_p = p.get("ordreArrivee")
+            num_pmu = p.get("numPmu")
+            if ordre_p is not None and num_pmu is not None:
                 try:
-                    resp2 = await self._client.get(participants_url)
-                    resp2.raise_for_status()
-                    p_data = resp2.json()
-                except Exception as e:
-                    logger.warning("PMU participants (trot arrivee) error: %s", e)
-                    return None
-                p_list = p_data if isinstance(p_data, list) else p_data.get("participants", [])
-                result = []
-                for p in p_list:
-                    ordre_p = p.get("ordreArrivee")
-                    num_pmu = p.get("numPmu")
-                    if ordre_p is not None and num_pmu is not None:
-                        try:
-                            result.append({"numero_cheval": int(num_pmu), "position": int(ordre_p)})
-                        except (ValueError, TypeError):
-                            pass
-                if result:
-                    result.sort(key=lambda x: x["position"])
-                    return result
-                return None
+                    result.append({"numero_cheval": int(num_pmu), "position": int(ordre_p)})
+                except (ValueError, TypeError):
+                    pass
+        if result:
+            result.sort(key=lambda x: x["position"])
+            return result
         return None
 
 
