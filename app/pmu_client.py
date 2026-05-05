@@ -255,20 +255,30 @@ class PMUClient:
                                 pass
                     return result if result else None
                 # Cas 2 : TROT — ordreArrivee est un entier par participant
-                participants_list = c.get("participants", [])
-                if participants_list:
-                    result = []
-                    for p in participants_list:
-                        ordre_p = p.get("ordreArrivee")
-                        num_pmu = p.get("numPmu")
-                        if ordre_p is not None and num_pmu is not None:
-                            try:
-                                result.append({"numero_cheval": int(num_pmu), "position": int(ordre_p)})
-                            except (ValueError, TypeError):
-                                pass
-                    if result:
-                        result.sort(key=lambda x: x["position"])
-                        return result
+                # L'endpoint /programme retourne participants=[] ; appel à l'endpoint dédié
+                participants_url = PMU_PARTICIPANTS_URL.format(
+                    date=date_str, reunion=reunion_num, course=course_num
+                )
+                try:
+                    resp2 = await self._client.get(participants_url)
+                    resp2.raise_for_status()
+                    p_data = resp2.json()
+                except Exception as e:
+                    logger.warning("PMU participants (trot arrivee) error: %s", e)
+                    return None
+                p_list = p_data if isinstance(p_data, list) else p_data.get("participants", [])
+                result = []
+                for p in p_list:
+                    ordre_p = p.get("ordreArrivee")
+                    num_pmu = p.get("numPmu")
+                    if ordre_p is not None and num_pmu is not None:
+                        try:
+                            result.append({"numero_cheval": int(num_pmu), "position": int(ordre_p)})
+                        except (ValueError, TypeError):
+                            pass
+                if result:
+                    result.sort(key=lambda x: x["position"])
+                    return result
                 return None
         return None
 
