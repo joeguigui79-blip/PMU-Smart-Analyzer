@@ -16,7 +16,8 @@ _REQUIRED_COLUMNS = {
     "courses":      ["statut_resultat"],
     "participants": ["score_repos", "score_partants", "score_hippodrome", "score_poids",
                      "position_arrivee", "score_corde", "score_regularite", "score_recence",
-                     "score_global_expert", "score_global_auto", "score_gains", "score_age"],
+                     "score_global_expert", "score_global_auto", "score_gains", "score_age",
+                     "score_sans_cote"],
 }
 
 

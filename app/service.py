@@ -184,6 +184,7 @@ async def load_participants_for_course(db: AsyncSession, course: Course, reunion
             score_outsider=p_data.get("score_outsider", 0.0),
             score_global_expert=p_data.get("score_expert", p_data["score_global"]),
             score_global_auto=p_data.get("score_auto", p_data["score_global"]),
+            score_sans_cote=p_data.get("score_sans_cote", p_data["score_global"]),
             score_gains=p_data.get("score_gains", 50.0),
             score_age=p_data.get("score_age", 50.0),
             is_value_bet=p_data["is_value_bet"],

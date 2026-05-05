@@ -35,6 +35,9 @@ class ParticipantSchema(BaseModel):
     confiance: str
     explication: str
     position_arrivee: int | None = None
+    score_global_expert: float = 0.0
+    score_global_auto: float = 0.0
+    score_sans_cote: float = 0.0
 
     class Config:
         from_attributes = True

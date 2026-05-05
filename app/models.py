@@ -95,6 +95,8 @@ class Participant(Base):
     # F5 : double scoring (Expert vs Auto-calibré)
     score_global_expert: Mapped[float] = mapped_column(Float, default=0.0)
     score_global_auto: Mapped[float] = mapped_column(Float, default=0.0)
+    # F6 : score sans cote (indépendant de la cote bookmaker)
+    score_sans_cote: Mapped[float] = mapped_column(Float, default=0.0)
     # Scores gains et age (stockés pour calibration)
     score_gains: Mapped[float] = mapped_column(Float, default=50.0)
     score_age: Mapped[float] = mapped_column(Float, default=50.0)
