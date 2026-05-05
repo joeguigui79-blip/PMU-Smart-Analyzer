@@ -1191,3 +1191,31 @@ body {
   width: 32px;
   text-align: right;
 }
+
+/* ---- Toggle Scoring Mode (Avec cote / Sans cote) ---- */
+.scoring-toggle {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.scoring-toggle-btn {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.scoring-toggle-btn.active {
+  background: #2E7D32;
+  border-color: #2E7D32;
+  color: #fff;
+}
+.scoring-toggle-btn:not(.active):hover {
+  border-color: var(--text-dim);
+  color: var(--text-dim);
+}

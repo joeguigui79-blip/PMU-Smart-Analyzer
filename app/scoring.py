@@ -1060,6 +1060,21 @@ def score_outsider_signals(
     return round(min(bonus, plafond), 2)
 
 
+def _weights_sans_cote(w: dict) -> dict:
+    """
+    Retourne une copie des poids w sans le critère 'value_cote',
+    en redistribuant son poids proportionnellement sur les critères restants.
+    Formule : nouveau_poids[k] = ancien_poids[k] / (1 - poids_cote)
+    """
+    poids_cote = w.get("value_cote", 0.0)
+    if poids_cote <= 0.0:
+        return w.copy()
+    restant = 1.0 - poids_cote
+    if restant <= 0.0:
+        restant = 1.0
+    return {k: (v / restant if k != "value_cote" else 0.0) for k, v in w.items()}
+
+
 def _compute_score_with_weights(
     w: dict,
     s_forme: float,
@@ -1242,6 +1257,12 @@ def calculer_scores(
         sg_expert_final = round(sg_expert + s_outsider, 2)
         sg_auto_final = round(sg_auto + s_outsider, 2)
 
+        # ── Score sans cote (redistribution proportionnelle des poids) ─────────
+        w_sc = _weights_sans_cote(w_expert)
+        sg_sans_cote = _compute_score_with_weights(w_sc, **_kwargs)
+        # Pas de bonus outsider (il dépend de la cote)
+        score_sans_cote = round(sg_sans_cote, 2)
+
         is_vb = is_value_bet(cote, score_global)
         confiance = get_confiance(score_global)
         explication = generer_explication(
@@ -1277,6 +1298,7 @@ def calculer_scores(
             # F5 : double scoring
             "score_expert":     sg_expert_final,
             "score_auto":       sg_auto_final,
+            "score_sans_cote":  score_sans_cote,
             "scoring_mode":     "auto" if w_auto else "expert",
             "is_value_bet":     is_vb,
             "confiance":        confiance,

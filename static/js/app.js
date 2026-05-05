@@ -6,6 +6,7 @@ let currentPage = "dashboard";
 var _coursesScrollPos = 0;
 var _coursesLoaded = false;
 let _betModalCourse = null;   // course courante pour le modal de pari
+var _scoringMode = "avec_cote"; // "avec_cote" | "sans_cote"
 
 const H = () => window.Components;
 
@@ -454,9 +455,25 @@ function renderCourseDetail(course, suggestions) {
   }
 
   if (course.participants && course.participants.length > 0) {
-    html += "<div class='section-title'>Partants (triés par score)</div>";
-    html += "<div class='card' style='padding:0 16px'>";
-    course.participants.forEach(function (p, i) {
+    var sectionTitle = _scoringMode === "sans_cote"
+      ? "Partants (triés sans cote)"
+      : "Partants (triés par score)";
+    html += "<div style='display:flex;align-items:center;justify-content:space-between;padding:16px 16px 4px'>" +
+      "<span class='section-title' style='padding:0;margin:0'>" + sectionTitle + "</span>" +
+      "<div class='scoring-toggle'>" +
+      "<button class='scoring-toggle-btn" + (_scoringMode === "avec_cote" ? " active" : "") + "' onclick='setScoringMode(\"avec_cote\")'>Avec cote</button>" +
+      "<button class='scoring-toggle-btn" + (_scoringMode === "sans_cote" ? " active" : "") + "' onclick='setScoringMode(\"sans_cote\")'>Sans cote</button>" +
+      "</div>" +
+      "</div>";
+
+    var sorted = course.participants.slice().sort(function(a, b) {
+      var sa = _scoringMode === "sans_cote" ? (a.score_sans_cote || 0) : (a.score_global || 0);
+      var sb = _scoringMode === "sans_cote" ? (b.score_sans_cote || 0) : (b.score_global || 0);
+      return sb - sa;
+    });
+
+    html += "<div class='card' style='padding:0 16px' id='participants-list'>";
+    sorted.forEach(function (p, i) {
       html += renderParticipantRowWithBet(p, i + 1, course, course.hippodrome);
     });
     html += "</div>";
@@ -583,6 +600,11 @@ function renderParticipantRowWithBet(p, rank, course, hippodrome) {
   const vb = p.is_value_bet ? "<span class='badge badge-green' style='font-size:10px'>VB</span>" : "";
   const safeP = JSON.stringify(p).replace(/"/g, "&quot;");
 
+  // Score affiché selon le mode actif
+  var displayScore = _scoringMode === "sans_cote"
+    ? (p.score_sans_cote != null ? p.score_sans_cote : p.score_global)
+    : p.score_global;
+
   // Position d'arrivée si disponible
   const posHtml = p.position_arrivee
     ? "<span class='arrival-pos pos-" + p.position_arrivee + "'>" + p.position_arrivee + "e</span>"
@@ -599,9 +621,9 @@ function renderParticipantRowWithBet(p, rank, course, hippodrome) {
     "<span class='p-cote'>" + H().formatCote(p.cote_actuelle) + "</span>" +
     "<div class='p-score-wrap'>" +
     "<div class='score-bar' style='width:70px'>" +
-    "<div class='score-bar-fill " + H().scoreClass(p.score_global) + "' style='width:" + p.score_global + "%'></div>" +
+    "<div class='score-bar-fill " + H().scoreClass(displayScore) + "' style='width:" + displayScore + "%'></div>" +
     "</div>" +
-    "<span class='score-label " + H().scoreClass(p.score_global) + "' style='font-size:12px'>" + Math.round(p.score_global) + "</span>" +
+    "<span class='score-label " + H().scoreClass(displayScore) + "' style='font-size:12px'>" + Math.round(displayScore) + "</span>" +
     "</div>" +
     "</div>" +
     "</div>" +
@@ -609,6 +631,14 @@ function renderParticipantRowWithBet(p, rank, course, hippodrome) {
     "<button class='bet-btn' onclick=\"event.stopPropagation();showBetModal(" + JSON.stringify(p).replace(/"/g, "&quot;") + ")\">🎯 Parier</button>" +
     "</div>" +
     "</div>";
+}
+
+// ---- Toggle mode scoring ----
+function setScoringMode(mode) {
+  _scoringMode = mode;
+  if (_betModalCourse) {
+    renderCourseDetail(_betModalCourse, null);
+  }
 }
 
 // ---- F3 : Modal de pari multi-type ----
@@ -1007,6 +1037,7 @@ window.closeModal = closeModal;
 window.doRefresh = doRefresh;
 window.navigate = navigate;
 window.showToast = showToast;
+window.setScoringMode = setScoringMode;
 
 // =============================================================================
 // PAGE STATS AVANCÉES
