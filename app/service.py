@@ -154,12 +154,44 @@ async def refresh_programme_statuts(db: AsyncSession) -> int:
         statut_frais = statuts_api.get(course.num_externe, course.statut)
         if statut_frais in STATUTS_TERMINES and course.statut_resultat != "TERMINE":
             course.statut = statut_frais
-            course.statut_resultat = "TERMINE"
             updated += 1
+            # Essayer de récupérer les positions d'arrivée (fetch_and_store_arrivee fait le commit)
+            try:
+                got_arrivee = await fetch_and_store_arrivee(db, course.id)
+                if not got_arrivee:
+                    # Arrivée pas encore dispo dans l'API, juste marquer TERMINE
+                    course.statut_resultat = "TERMINE"
+            except Exception as e:
+                logger.warning("Erreur récup arrivée course %d: %s", course.id, e)
+                course.statut_resultat = "TERMINE"
 
     if updated:
         await db.commit()
         logger.info("refresh_programme_statuts : %d cours(es) marquée(s) TERMINE", updated)
+
+    # --- 2e passe : rattraper les courses déjà TERMINE sans positions d'arrivée ---
+    missing_result = await db.execute(
+        select(Course)
+        .join(Reunion)
+        .where(
+            Reunion.date_str == date_str,
+            Course.statut_resultat == "TERMINE",
+        )
+    )
+    missing_courses = missing_result.scalars().all()
+
+    for course in missing_courses:
+        p_check = await db.execute(
+            select(Participant).where(
+                Participant.course_id == course.id,
+                Participant.position_arrivee.isnot(None),
+            ).limit(1)
+        )
+        if p_check.scalar_one_or_none() is None:
+            try:
+                await fetch_and_store_arrivee(db, course.id)
+            except Exception as e:
+                logger.warning("Retry arrivée course %d: %s", course.id, e)
 
     return updated
 
