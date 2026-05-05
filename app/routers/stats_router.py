@@ -147,7 +147,7 @@ async def _compute_evolution(db: AsyncSession) -> dict:
     from datetime import datetime, timedelta, timezone
     from app.models import Reunion
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     cutoff_7 = now - timedelta(days=7)
     cutoff_14 = now - timedelta(days=14)
 
@@ -168,11 +168,13 @@ async def _compute_evolution(db: AsyncSession) -> dict:
         heure = course.heure_depart
         if heure is None:
             continue
+        # Normaliser en TZ-naive pour comparaison cohérente avec SQLite
+        heure_naive = heure.replace(tzinfo=None) if heure.tzinfo else heure
 
         # Déterminer la fenêtre
-        if heure >= cutoff_7:
+        if heure_naive >= cutoff_7:
             window = "recent"
-        elif heure >= cutoff_14:
+        elif heure_naive >= cutoff_14:
             window = "prev"
         else:
             continue
@@ -215,13 +217,9 @@ async def _compute_evolution(db: AsyncSession) -> dict:
 
 
 async def _compute_critere_performance(db: AsyncSession) -> list[dict]:
-    """Retourne les critères triés par corrélation avec le bon classement."""
-    from app.models import ScoringWeight
-
+    """Retourne les critères triés par poids de calibration (proxy de performance)."""
     result = await db.execute(
-        select(ScoringWeight)
-        .where(ScoringWeight.nb_samples > 0)
-        .order_by(ScoringWeight.precision.desc())
+        select(CalibrationWeight).order_by(CalibrationWeight.poids.desc())
     )
     rows = result.scalars().all()
 
@@ -235,8 +233,7 @@ async def _compute_critere_performance(db: AsyncSession) -> list[dict]:
         out.append({
             "critere": row.critere,
             "discipline": row.discipline,
-            "precision": round(row.precision * 100, 1),
-            "nb_samples": row.nb_samples,
+            "poids": round(row.poids * 100, 1),
         })
 
     return out[:10]  # Top 10 critères
