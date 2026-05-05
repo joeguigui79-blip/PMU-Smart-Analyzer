@@ -921,20 +921,25 @@ def score_outsider_signals(
     participant: dict,
     cote_actuelle: float | None,
     cote_initiale: float | None,
+    discipline: str = "PLAT",
 ) -> float:
     """
-    Calcule un bonus outsider (0-30 points) cumulant 4 critères :
+    Calcule un bonus outsider cumulant 4 critères :
 
     1. Variation de cote (baisse > 20% = argent informé)          → 0 à +15 pts
     2. Changement de driver/jockey sur un outsider (cote > 10)    → 0 à +12 pts
     3. Progression dans la musique (dernières 5 positions)         → 0 à +12 pts
     4. Ratio victoires ou top3 / courses si sous-évalué            → 0 à +10 pts
 
-    Le bonus n'est appliqué que si cote_actuelle > 6 (outsider).
-    Le total est plafonné à 30 points.
+    PLAT   : seuil cote > 10, plafond 15 pts (pour ne pas perturber les bons résultats)
+    Autres : seuil cote > 6,  plafond 30 pts
     """
+    # Seuil et plafond selon la discipline
+    seuil_cote = 10.0 if discipline == "PLAT" else 6.0
+    plafond = 15.0 if discipline == "PLAT" else 30.0
+
     # Garde : seulement pour les outsiders
-    if cote_actuelle is None or cote_actuelle <= 6.0:
+    if cote_actuelle is None or cote_actuelle <= seuil_cote:
         return 0.0
 
     bonus = 0.0
@@ -982,8 +987,8 @@ def score_outsider_signals(
                 bonus += 3.0
         # Bonus additionnel : récente victoire ou place malgré cote haute
         if len(positions) >= 1 and positions[0] <= 3:
-            # Dernier résultat = top 3 alors que cote > 6
-            bonus += 4.0
+            # Dernier résultat = top 3 alors que cote > seuil
+            bonus += 2.0
 
     # ── Critère 4 : ratio victoires/courses (sous-évaluation) ────────────────
     nb_courses = participant.get("nombre_courses", 0) or 0
@@ -1001,7 +1006,7 @@ def score_outsider_signals(
         elif ratio_top3 > 0.35 and cote_actuelle > 8.0:
             bonus += 4.0
 
-    return round(min(bonus, 30.0), 2)
+    return round(min(bonus, plafond), 2)
 
 
 def calculer_scores(
@@ -1134,7 +1139,7 @@ def calculer_scores(
             )
 
         # ── Bonus outsider (4 critères, plafonné 30 pts) ────────────────────
-        s_outsider = score_outsider_signals(p, cote, p.get("cote_initiale"))
+        s_outsider = score_outsider_signals(p, cote, p.get("cote_initiale"), discipline=discipline)
         score_global = round(score_global + s_outsider, 2)
 
         is_vb = is_value_bet(cote, score_global)
