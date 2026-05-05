@@ -47,6 +47,11 @@
     let i = 0;
     while (i < musique.length && items.length < 8) {
       const c = musique[i];
+      if (c === '(') {
+        while (i < musique.length && musique[i] !== ')') i++;
+        i++;
+        continue;
+      }
       if (/\d/.test(c)) {
         let num = c;
         if (i + 1 < musique.length && /\d/.test(musique[i + 1])) {

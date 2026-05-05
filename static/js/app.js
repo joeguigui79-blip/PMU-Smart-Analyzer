@@ -809,42 +809,63 @@ function showParticipantModal(p) {
   var discipline = (_betModalCourse && _betModalCourse.discipline) ? _betModalCourse.discipline.toUpperCase() : "PLAT";
   var isTrot = discipline.includes("ATTELE") || discipline.includes("MONTE") || discipline.includes("TROT");
   var isObstacle = discipline.includes("HAIE") || discipline.includes("STEEPLE") || discipline.includes("CROSS") || discipline.includes("OBSTACLE");
+  var isTrotMonte = discipline.includes("MONTE");
 
   var breakdown;
-  if (isTrot) {
+  if (isTrot && !isTrotMonte) {
+    // TROT_ATTELE : forme 26%, value_cote 14%, corde 16%, regularite 13%, gains 7%, recence 8%, entraineur 6%, distance 5%, age 3%, partants 2%
     breakdown = [
-      { label: "Forme récente (trot)", val: p.score_forme,      weight: "25%" },
-      { label: "Cote / Valeur",        val: p.score_cote,       weight: "18%" },
-      { label: "Corde (numéro départ)",val: p.score_corde != null ? p.score_corde : 50,  weight: "15%" },
-      { label: "Régularité (sans D)",  val: p.score_regularite != null ? p.score_regularite : 50, weight: "12%" },
-      { label: "Récence (saison)",     val: p.score_recence != null ? p.score_recence : 50, weight: "8%" },
-      { label: "Driver / Entraîneur",  val: p.score_entraineur, weight: "7%" },
-      { label: "Distance",             val: p.score_distance,   weight: "6%" },
-      { label: "Partants",             val: p.score_partants || 0, weight: "5%" },
-      { label: "Hippodrome",           val: p.score_hippodrome || 0, weight: "4%" },
+      { label: "Forme récente",            val: p.score_forme,                                          weight: "26%" },
+      { label: "Cote / Valeur",            val: p.score_cote,                                           weight: "14%" },
+      { label: "Corde (numéro départ)",    val: p.score_corde != null ? p.score_corde : 50,             weight: "16%" },
+      { label: "Régularité (sans D)",      val: p.score_regularite != null ? p.score_regularite : 50,  weight: "13%" },
+      { label: "Gains",                    val: p.score_gains != null ? p.score_gains : 50,             weight: "7%" },
+      { label: "Récence (saison)",         val: p.score_recence != null ? p.score_recence : 50,        weight: "8%" },
+      { label: "Driver / Entraîneur",      val: p.score_entraineur,                                     weight: "6%" },
+      { label: "Distance",                 val: p.score_distance,                                       weight: "5%" },
+      { label: "Âge",                      val: p.score_age != null ? p.score_age : 50,                weight: "3%" },
+      { label: "Partants",                 val: p.score_partants || 0,                                  weight: "2%" },
+    ];
+  } else if (isTrotMonte) {
+    // TROT_MONTE : forme 27%, value_cote 14%, corde 13%, regularite 11%, gains 7%, recence 8%, jockey 8%, entraineur 5%, distance 4%, age 3%
+    breakdown = [
+      { label: "Forme récente",            val: p.score_forme,                                          weight: "27%" },
+      { label: "Cote / Valeur",            val: p.score_cote,                                           weight: "14%" },
+      { label: "Corde (numéro départ)",    val: p.score_corde != null ? p.score_corde : 50,             weight: "13%" },
+      { label: "Régularité (sans D)",      val: p.score_regularite != null ? p.score_regularite : 50,  weight: "11%" },
+      { label: "Gains",                    val: p.score_gains != null ? p.score_gains : 50,             weight: "7%" },
+      { label: "Récence (saison)",         val: p.score_recence != null ? p.score_recence : 50,        weight: "8%" },
+      { label: "Jockey",                   val: p.score_jockey,                                         weight: "8%" },
+      { label: "Entraîneur",               val: p.score_entraineur,                                     weight: "5%" },
+      { label: "Distance",                 val: p.score_distance,                                       weight: "4%" },
+      { label: "Âge",                      val: p.score_age != null ? p.score_age : 50,                weight: "3%" },
     ];
   } else if (isObstacle) {
+    // HAIE/STEEPLE/CROSS : forme 30%, value_cote 14%, jockey 15%, terrain 15%, entraineur 8%, distance 7%, gains 5%, age 3%, partants 3%
     breakdown = [
-      { label: "Forme récente",   val: p.score_forme,      weight: "32%" },
-      { label: "Cote / Valeur",   val: p.score_cote,       weight: "20%" },
-      { label: "Jockey",          val: p.score_jockey,     weight: "15%" },
-      { label: "Terrain",         val: p.score_terrain,    weight: "12%" },
-      { label: "Entraîneur",      val: p.score_entraineur, weight: "8%" },
-      { label: "Distance",        val: p.score_distance,   weight: "7%" },
-      { label: "Partants",        val: p.score_partants || 0, weight: "4%" },
-      { label: "Hippodrome",      val: p.score_hippodrome || 0, weight: "2%" },
+      { label: "Forme récente",   val: p.score_forme,                                    weight: "30%" },
+      { label: "Cote / Valeur",   val: p.score_cote,                                     weight: "14%" },
+      { label: "Jockey",          val: p.score_jockey,                                   weight: "15%" },
+      { label: "Terrain",         val: p.score_terrain,                                  weight: "15%" },
+      { label: "Entraîneur",      val: p.score_entraineur,                               weight: "8%" },
+      { label: "Distance",        val: p.score_distance,                                 weight: "7%" },
+      { label: "Gains",           val: p.score_gains != null ? p.score_gains : 50,       weight: "5%" },
+      { label: "Âge",             val: p.score_age != null ? p.score_age : 50,           weight: "3%" },
+      { label: "Partants",        val: p.score_partants || 0,                            weight: "3%" },
     ];
   } else {
+    // PLAT : forme 32%, value_cote 15%, jockey 12%, entraineur 8%, distance 10%, terrain 8%, repos 5%, gains 5%, age 3%, partants 2%
     breakdown = [
-      { label: "Forme récente",   val: p.score_forme,      weight: "30%" },
-      { label: "Cote / Valeur",   val: p.score_cote,       weight: "22%" },
-      { label: "Jockey",          val: p.score_jockey,     weight: "12%" },
-      { label: "Entraîneur",      val: p.score_entraineur, weight: "9%" },
-      { label: "Distance",        val: p.score_distance,   weight: "7%" },
-      { label: "Terrain",         val: p.score_terrain,    weight: "6%" },
-      { label: "Repos",           val: p.score_repos || 0, weight: "6%" },
-      { label: "Partants",        val: p.score_partants || 0, weight: "4%" },
-      { label: "Hippodrome",      val: p.score_hippodrome || 0, weight: "4%" },
+      { label: "Forme récente",   val: p.score_forme,                                    weight: "32%" },
+      { label: "Cote / Valeur",   val: p.score_cote,                                     weight: "15%" },
+      { label: "Jockey",          val: p.score_jockey,                                   weight: "12%" },
+      { label: "Distance",        val: p.score_distance,                                 weight: "10%" },
+      { label: "Entraîneur",      val: p.score_entraineur,                               weight: "8%" },
+      { label: "Terrain",         val: p.score_terrain,                                  weight: "8%" },
+      { label: "Repos",           val: p.score_repos || 0,                               weight: "5%" },
+      { label: "Gains",           val: p.score_gains != null ? p.score_gains : 50,       weight: "5%" },
+      { label: "Âge",             val: p.score_age != null ? p.score_age : 50,           weight: "3%" },
+      { label: "Partants",        val: p.score_partants || 0,                            weight: "2%" },
     ];
   }
 

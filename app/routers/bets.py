@@ -65,7 +65,7 @@ async def create_bet(payload: BetCreate, db: AsyncSession = Depends(get_db)):
     # Validation nombre de chevaux
     nb_requis = {
         "GAGNANT": 1, "PLACE": 1,
-        "COUPLE": 2, "TIERCE": 3, "DEUX_SUR_QUATRE": 4,
+        "COUPLE": 2, "TIERCE": 3, "DEUX_SUR_QUATRE": 2,
     }
     requis = nb_requis[payload.type_pari.upper()]
     if len(payload.chevaux) != requis:

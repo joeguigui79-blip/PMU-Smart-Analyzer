@@ -96,7 +96,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
             select(func.count(Course.id))
             .join(Reunion)
             .where(Reunion.date_str == ddmmyyyy)
-            .where(Course.statut.in_(["ARRIVEE", "FIN_COURSE", "ARRIVEE_DEFINITIVE_COMPLETE"]))
+            .where(Course.statut_resultat == 'TERMINE')
         )
         nb_finished = fin_result.scalar_one() or 0
 

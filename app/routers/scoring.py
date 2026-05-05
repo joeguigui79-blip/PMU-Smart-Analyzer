@@ -212,6 +212,11 @@ async def optimize_weights(db: AsyncSession = Depends(get_db)):
         # Poids par défaut pour cette discipline
         default_weights = SCORING_WEIGHTS_DISCIPLINE.get(disc, SCORING_WEIGHTS_DISCIPLINE["PLAT"])
 
+        # Calculer d'abord tous les nouveaux poids bruts pour la discipline
+        new_poids: dict[str, float] = {}
+        precisions: dict[str, float] = {}
+        samples: dict[str, int] = {}
+
         for critere, stats in critere_stats.items():
             if stats["total"] == 0:
                 continue
@@ -226,9 +231,18 @@ async def optimize_weights(db: AsyncSession = Depends(get_db)):
                 adjustment = 1.0 + (precision - baseline) * 0.5
             else:
                 adjustment = max(0.5, 1.0 - (baseline - precision) * 0.5)
-            new_poids = poids_defaut * adjustment
 
-            # Upsert en DB
+            new_poids[critere] = poids_defaut * adjustment
+            precisions[critere] = precision
+            samples[critere] = stats["total"]
+
+        # Normaliser les poids pour que leur somme = 1
+        total = sum(new_poids.values())
+        if total > 0:
+            new_poids = {k: round(v / total, 4) for k, v in new_poids.items()}
+
+        # Upsert en DB avec poids normalisés
+        for critere, poids_val in new_poids.items():
             sw_result = await db.execute(
                 select(ScoringWeight).where(
                     ScoringWeight.discipline == disc,
@@ -237,18 +251,18 @@ async def optimize_weights(db: AsyncSession = Depends(get_db)):
             )
             sw = sw_result.scalar_one_or_none()
             if sw:
-                sw.precision = round(precision, 4)
-                sw.poids = round(new_poids, 4)
-                sw.nb_samples = stats["total"]
+                sw.precision = round(precisions[critere], 4)
+                sw.poids = poids_val
+                sw.nb_samples = samples[critere]
                 sw.updated_at = datetime.utcnow()
                 updated_count += 1
             else:
                 sw = ScoringWeight(
                     discipline=disc,
                     critere=critere,
-                    poids=round(new_poids, 4),
-                    precision=round(precision, 4),
-                    nb_samples=stats["total"],
+                    poids=poids_val,
+                    precision=round(precisions[critere], 4),
+                    nb_samples=samples[critere],
                 )
                 db.add(sw)
                 updated_count += 1

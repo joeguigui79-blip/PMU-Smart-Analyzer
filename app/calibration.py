@@ -41,6 +41,7 @@ CRITERE_FIELD_MAP = {
     "hippodrome":    "score_hippodrome",
     "gains":         "score_gains",
     "age":           "score_age",
+    "poids":         "score_poids",
     "corde":         "score_corde",
     "regularite":    "score_regularite",
     "recence":       "score_recence",

@@ -13,21 +13,6 @@ def today_str() -> str:
     """Date du jour au format DDMMYYYY pour l'API PMU."""
     return datetime.now(PARIS_TZ).strftime("%d%m%Y")
 
-# Pondérations du moteur de scoring — PLAT (défaut, somme = 1.0)
-SCORING_WEIGHTS = {
-    "forme_recente": 0.32,
-    "value_cote":    0.15,
-    "jockey":        0.12,
-    "entraineur":    0.08,
-    "distance":      0.10,
-    "terrain":       0.08,
-    "repos":         0.05,
-    "gains":         0.05,
-    "age":           0.03,
-    "partants":      0.02,
-    "hippodrome":    0.00,
-}
-
 # Pondérations différenciées par discipline (somme = 1.0 pour chaque)
 SCORING_WEIGHTS_DISCIPLINE = {
     "PLAT": {
@@ -101,6 +86,9 @@ SCORING_WEIGHTS_DISCIPLINE = {
         "partants":      0.03,
     },
 }
+
+# Rétro-compatibilité : référence aux poids PLAT
+SCORING_WEIGHTS = SCORING_WEIGHTS_DISCIPLINE['PLAT']
 
 # Seuil value bet : cote réelle >= facteur * probabilité implicite estimée
 VALUE_BET_FACTOR = 1.30

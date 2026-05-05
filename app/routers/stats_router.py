@@ -144,10 +144,10 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
 
 async def _compute_evolution(db: AsyncSession) -> dict:
     """Calcule le taux de réussite top-1 sur les 7 derniers jours vs les 7 précédents."""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from app.models import Reunion
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cutoff_7 = now - timedelta(days=7)
     cutoff_14 = now - timedelta(days=14)
 

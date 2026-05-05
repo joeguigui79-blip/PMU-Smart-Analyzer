@@ -31,6 +31,10 @@ class ParticipantSchema(BaseModel):
     score_corde: float = 50.0
     score_regularite: float = 50.0
     score_recence: float = 50.0
+    score_gains: float = 50.0
+    score_age: float = 50.0
+    score_outsider: float = 0.0
+    driver_change: bool = False
     is_value_bet: bool
     confiance: str
     explication: str
