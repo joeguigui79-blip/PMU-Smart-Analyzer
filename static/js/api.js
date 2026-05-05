@@ -61,6 +61,11 @@ const API = {
   scoringAccuracyByDiscipline: function () { return apiFetch("/api/scoring/accuracy-by-discipline"); },
   scoringDisciplineStats: function () { return apiFetch("/api/scoring/discipline-stats"); },
   scoringOptimize: function () { return apiFetch("/api/scoring/optimize", { method: "POST" }); },
+
+  // ---- Stats avancées + Calibration ----
+  statsScoring:     function () { return apiFetch("/api/stats/scoring"); },
+  statsCalibration: function () { return apiFetch("/api/stats/calibration"); },
+  calibrate:        function () { return apiFetch("/api/calibrate", { method: "POST" }); },
 };
 
 window.API = API;

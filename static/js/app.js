@@ -47,6 +47,7 @@ function navigate(page, opts) {
     }
   }
   else if (page === "bets") window.Bets && window.Bets.renderBetsPage();
+  else if (page === "stats") loadStatsPage();
 }
 
 // ---- Toast ----
@@ -1006,3 +1007,210 @@ window.closeModal = closeModal;
 window.doRefresh = doRefresh;
 window.navigate = navigate;
 window.showToast = showToast;
+
+// =============================================================================
+// PAGE STATS AVANCÉES
+// =============================================================================
+
+async function loadStatsPage() {
+  const container = document.getElementById("stats-content");
+  if (!container) return;
+  container.innerHTML = '<div class="stats-loading"><div class="spinner"></div><p>Chargement des statistiques…</p></div>';
+
+  try {
+    const [scoringData, calibData] = await Promise.all([
+      API.statsScoring(),
+      API.statsCalibration(),
+    ]);
+    container.innerHTML = renderStatsPage(scoringData, calibData);
+  } catch (e) {
+    container.innerHTML = '<div class="stats-error">Erreur lors du chargement des statistiques.<br>' + (e.message || "") + "</div>";
+  }
+}
+
+function _rateBadge(rate) {
+  var cls = rate >= 40 ? "badge-green" : rate >= 25 ? "badge-orange" : "badge-red";
+  return '<span class="stat-badge ' + cls + '">' + rate + "%</span>";
+}
+
+function _progressBar(value, max) {
+  var pct = Math.min(100, Math.round((value / max) * 100));
+  return (
+    '<div class="prog-bar-wrap">' +
+    '<div class="prog-bar" style="width:' + pct + '%"></div>' +
+    '<span class="prog-bar-label">' + pct + "%</span>" +
+    "</div>"
+  );
+}
+
+function renderStatsPage(scoringData, calibData) {
+  var html = '<div class="stats-page">';
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+  html += '<div class="stats-header">';
+  html += '<h2 class="stats-title">Stats avancées — Scoring</h2>';
+  html += '<p class="stats-subtitle">Expert (poids manuels) vs Auto-calibré (historique)</p>';
+  html += '<button class="btn-calibrate" onclick="doCalibrate()">Recalibrer maintenant</button>';
+  html += "</div>";
+
+  var discs = (scoringData && scoringData.disciplines) ? scoringData.disciplines : {};
+  var calDiscs = (calibData && calibData.disciplines) ? calibData.disciplines : {};
+  var totalCourses = (scoringData && scoringData.total_courses) || 0;
+
+  // ── Résumé global ────────────────────────────────────────────────────────────
+  html += '<div class="stats-summary-row">';
+  html += '<div class="stats-summary-card"><div class="ssc-value">' + totalCourses + '</div><div class="ssc-label">Courses analysées</div></div>';
+
+  var modeActif = calibData && calibData.calibrated ? "Auto" : "Expert";
+  var modeClass = calibData && calibData.calibrated ? "mode-auto" : "mode-expert";
+  html += '<div class="stats-summary-card"><div class="ssc-value ' + modeClass + '">' + modeActif + '</div><div class="ssc-label">Mode actif global</div></div>';
+
+  if (calibData && calibData.last_updated_global) {
+    var dt = new Date(calibData.last_updated_global);
+    var dtStr = dt.toLocaleDateString("fr-FR") + " " + dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    html += '<div class="stats-summary-card"><div class="ssc-value ssc-small">' + dtStr + '</div><div class="ssc-label">Dernière calibration</div></div>';
+  } else {
+    html += '<div class="stats-summary-card"><div class="ssc-value ssc-small">—</div><div class="ssc-label">Dernière calibration</div></div>';
+  }
+  html += "</div>";
+
+  // ── Évolution 7j ─────────────────────────────────────────────────────────────
+  if (scoringData && scoringData.evolution) {
+    var ev = scoringData.evolution;
+    var trendIcon = ev.trend === "up" ? "↑" : ev.trend === "down" ? "↓" : "→";
+    var trendCls  = ev.trend === "up" ? "trend-up" : ev.trend === "down" ? "trend-down" : "trend-stable";
+    html += '<div class="stats-section">';
+    html += '<h3 class="stats-section-title">Évolution du taux top-1 <span class="trend-icon ' + trendCls + '">' + trendIcon + "</span></h3>";
+    html += '<div class="evolution-row">';
+    html += '<div class="evolution-card"><div class="ev-label">7 derniers jours</div>';
+    html += '<div class="ev-value">' + _rateBadge(ev.last_7d.top1_rate) + '</div>';
+    html += '<div class="ev-sub">' + ev.last_7d.nb_courses + " courses</div></div>";
+    html += '<div class="evolution-card"><div class="ev-label">7 jours précédents</div>';
+    html += '<div class="ev-value">' + _rateBadge(ev.prev_7d.top1_rate) + '</div>';
+    html += '<div class="ev-sub">' + ev.prev_7d.nb_courses + " courses</div></div>";
+    html += "</div></div>";
+  }
+
+  // ── Taux de réussite par discipline ──────────────────────────────────────────
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-section-title">Taux de réussite par discipline</h3>';
+
+  var discKeys = Object.keys(discs);
+  if (discKeys.length === 0) {
+    html += '<p class="stats-empty">Pas encore de courses terminées.</p>';
+  } else {
+    discKeys.forEach(function (disc) {
+      var d = discs[disc];
+      var calD = calDiscs[disc] || {};
+      var modeBadge = calD.active_mode === "auto"
+        ? '<span class="mode-badge mode-auto">Auto</span>'
+        : '<span class="mode-badge mode-expert">Expert</span>';
+
+      html += '<div class="disc-card">';
+      html += '<div class="disc-card-header">';
+      html += '<span class="disc-name">' + disc + '</span>';
+      html += modeBadge;
+      html += '<span class="disc-count">' + d.nb_courses + " courses</span>";
+      html += "</div>";
+
+      if (!d.has_auto_data) {
+        var min = (scoringData.min_courses_required || 10);
+        html += '<div class="disc-progress-msg">Calibration auto disponible après ' + min + ' courses. ';
+        html += _progressBar(d.nb_courses, min);
+        html += "</div>";
+      }
+
+      // Tableau comparatif Expert vs Auto
+      html += '<table class="stats-table">';
+      html += "<thead><tr><th>Critère</th><th>Expert</th><th>Auto</th></tr></thead><tbody>";
+      html += "<tr><td>Top-1 exact</td><td>" + _rateBadge(d.expert.top1_rate) + "</td><td>" + _rateBadge(d.auto.top1_rate) + "</td></tr>";
+      html += "<tr><td>Top-3 prédits</td><td>" + _rateBadge(d.expert.top3_rate) + "</td><td>" + _rateBadge(d.auto.top3_rate) + "</td></tr>";
+      html += "<tr><td>Top-5 prédits</td><td>" + _rateBadge(d.expert.top5_rate) + "</td><td>" + _rateBadge(d.auto.top5_rate) + "</td></tr>";
+      html += "</tbody></table>";
+      html += "</div>"; // disc-card
+    });
+  }
+  html += "</div>"; // stats-section
+
+  // ── Poids auto-calibrés ───────────────────────────────────────────────────────
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-section-title">Poids auto-calibrés actuels</h3>';
+
+  var calDiscKeys = Object.keys(calDiscs);
+  if (calDiscKeys.length === 0) {
+    html += '<p class="stats-empty">Aucune calibration auto disponible. Cliquez sur "Recalibrer maintenant".</p>';
+  } else {
+    calDiscKeys.forEach(function (disc) {
+      var calD = calDiscs[disc];
+      if (!calD.auto_weights) return;
+
+      html += '<div class="weights-card">';
+      html += '<div class="weights-card-title">' + disc;
+      if (calD.last_updated) {
+        var d2 = new Date(calD.last_updated);
+        html += ' <span class="weights-date">MAJ: ' + d2.toLocaleDateString("fr-FR") + "</span>";
+      }
+      html += "</div>";
+
+      // Barres horizontales pour chaque critère
+      var entries = Object.entries(calD.auto_weights || {}).sort(function (a, b) { return b[1] - a[1]; });
+      var expertWeights = calD.expert_weights || {};
+
+      entries.forEach(function (kv) {
+        var critere = kv[0];
+        var autoVal = kv[1];
+        var expertVal = expertWeights[critere] || 0;
+        var autoPct = Math.round(autoVal * 100);
+        var expertPct = Math.round(expertVal * 100);
+
+        html += '<div class="weight-row">';
+        html += '<span class="weight-label">' + critere + "</span>";
+        html += '<div class="weight-bars">';
+        // Expert bar
+        html += '<div class="weight-bar-group">';
+        html += '<span class="wb-tag expert-tag">Expert</span>';
+        html += '<div class="wb-track"><div class="wb-fill expert-fill" style="width:' + Math.min(100, expertPct * 3) + '%"></div></div>';
+        html += '<span class="wb-pct">' + expertPct + "%</span>";
+        html += "</div>";
+        // Auto bar
+        html += '<div class="weight-bar-group">';
+        html += '<span class="wb-tag auto-tag">Auto</span>';
+        html += '<div class="wb-track"><div class="wb-fill auto-fill" style="width:' + Math.min(100, autoPct * 3) + '%"></div></div>';
+        html += '<span class="wb-pct">' + autoPct + "%</span>";
+        html += "</div>";
+        html += "</div>"; // weight-bars
+        html += "</div>"; // weight-row
+      });
+
+      html += "</div>"; // weights-card
+    });
+  }
+  html += "</div>"; // stats-section
+
+  html += "</div>"; // stats-page
+  return html;
+}
+
+async function doCalibrate() {
+  var btn = document.querySelector(".btn-calibrate");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Calibration en cours…";
+  }
+  try {
+    var result = await API.calibrate();
+    var msg = "Calibration terminée. Disciplines calibrées: " +
+      ((result.disciplines_calibrated || []).join(", ") || "aucune");
+    showToast(msg);
+    // Recharger la page stats
+    loadStatsPage();
+  } catch (e) {
+    showToast("Erreur lors de la calibration: " + (e.message || ""), true);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Recalibrer maintenant";
+    }
+  }
+}
+
+window.doCalibrate = doCalibrate;

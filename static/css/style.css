@@ -880,3 +880,314 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
+
+/* =============================================================================
+   PAGE STATS AVANCÉES
+   ============================================================================= */
+
+.stats-page {
+  padding: 12px 12px 80px;
+}
+
+.stats-loading,
+.stats-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 16px;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 14px;
+}
+
+/* Header Stats */
+.stats-header {
+  margin-bottom: 16px;
+}
+.stats-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.stats-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.btn-calibrate {
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-calibrate:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-calibrate:not(:disabled):active {
+  opacity: 0.8;
+}
+
+/* Résumé global (3 cards en ligne) */
+.stats-summary-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.stats-summary-card {
+  flex: 1;
+  min-width: 90px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.ssc-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gold);
+}
+.ssc-value.ssc-small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ssc-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.mode-auto   { color: var(--green) !important; }
+.mode-expert { color: var(--gold) !important; }
+
+/* Sections */
+.stats-section {
+  margin-bottom: 20px;
+}
+.stats-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stats-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 10px 0;
+}
+
+/* Tendance 7j */
+.evolution-row {
+  display: flex;
+  gap: 10px;
+}
+.evolution-card {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.ev-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.ev-value {
+  margin-bottom: 4px;
+}
+.ev-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.trend-icon    { font-size: 16px; font-weight: 700; }
+.trend-up      { color: var(--green); }
+.trend-down    { color: var(--red); }
+.trend-stable  { color: var(--gold); }
+
+/* Badges taux */
+.stat-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.badge-green  { background: var(--green-dim);  color: var(--green); }
+.badge-orange { background: rgba(245,166,35,0.15); color: var(--gold); }
+.badge-red    { background: var(--red-dim);    color: var(--red); }
+
+/* Discipline cards */
+.disc-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.disc-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.disc-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+.disc-count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.mode-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.mode-badge.mode-auto   { background: var(--green-dim); color: var(--green); }
+.mode-badge.mode-expert { background: var(--gold-dim);  color: var(--gold); }
+
+/* Progress bar (calibration progress) */
+.disc-progress-msg {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.prog-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg3);
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin-top: 4px;
+}
+.prog-bar {
+  height: 6px;
+  background: var(--green);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.prog-bar-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Stats table */
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.stats-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.stats-table td {
+  padding: 6px 6px;
+  border-bottom: 1px solid rgba(42, 48, 69, 0.5);
+  color: var(--text);
+}
+.stats-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Weight cards */
+.weights-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.weights-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.weights-date {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Weight bars */
+.weight-row {
+  margin-bottom: 10px;
+}
+.weight-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+  text-transform: capitalize;
+}
+.weight-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.weight-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.wb-tag {
+  font-size: 9px;
+  font-weight: 700;
+  width: 38px;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+.expert-tag { color: var(--gold); }
+.auto-tag   { color: var(--green); }
+.wb-track {
+  flex: 1;
+  height: 7px;
+  background: var(--bg3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.wb-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.expert-fill { background: var(--gold); }
+.auto-fill   { background: var(--green); }
+.wb-pct {
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 32px;
+  text-align: right;
+}

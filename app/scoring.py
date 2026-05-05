@@ -1009,6 +1009,72 @@ def score_outsider_signals(
     return round(min(bonus, plafond), 2)
 
 
+def _compute_score_with_weights(
+    w: dict,
+    s_forme: float,
+    s_cote: float,
+    s_jockey: float,
+    s_entraineur: float,
+    s_distance: float,
+    s_terrain: float,
+    s_repos: float,
+    s_partants: float,
+    s_hippodrome: float,
+    s_gains: float,
+    s_age: float,
+    s_corde: float,
+    s_regularite: float,
+    s_recence: float,
+    is_trot: bool,
+    is_obstacle: bool,
+) -> float:
+    """Calcule le score global pondéré pour un jeu de poids donné."""
+    if is_trot:
+        return round(
+            s_forme        * w.get("forme_recente", 0.24)
+            + s_cote       * w.get("value_cote",    0.17)
+            + s_corde      * w.get("corde",         0.14)
+            + s_regularite * w.get("regularite",    0.11)
+            + s_gains      * w.get("gains",         0.08)
+            + s_recence    * w.get("recence",       0.07)
+            + s_entraineur * w.get("entraineur",    0.06)
+            + s_distance   * w.get("distance",      0.05)
+            + s_age        * w.get("age",           0.04)
+            + s_partants   * w.get("partants",      0.04)
+            + s_hippodrome * w.get("hippodrome",    0.0),
+            2,
+        )
+    elif is_obstacle:
+        return round(
+            s_forme        * w.get("forme_recente", 0.30)
+            + s_cote       * w.get("value_cote",    0.18)
+            + s_jockey     * w.get("jockey",        0.14)
+            + s_terrain    * w.get("terrain",       0.12)
+            + s_entraineur * w.get("entraineur",    0.08)
+            + s_distance   * w.get("distance",      0.07)
+            + s_gains      * w.get("gains",         0.05)
+            + s_age        * w.get("age",           0.03)
+            + s_partants   * w.get("partants",      0.03)
+            + s_hippodrome * w.get("hippodrome",    0.0),
+            2,
+        )
+    else:
+        return round(
+            s_forme        * w.get("forme_recente", 0.28)
+            + s_cote       * w.get("value_cote",    0.20)
+            + s_jockey     * w.get("jockey",        0.10)
+            + s_entraineur * w.get("entraineur",    0.08)
+            + s_distance   * w.get("distance",      0.07)
+            + s_terrain    * w.get("terrain",       0.06)
+            + s_repos      * w.get("repos",         0.05)
+            + s_gains      * w.get("gains",         0.07)
+            + s_age        * w.get("age",           0.04)
+            + s_partants   * w.get("partants",      0.03)
+            + s_hippodrome * w.get("hippodrome",    0.02),
+            2,
+        )
+
+
 def calculer_scores(
     participants: list[dict],
     distance_course: int,
@@ -1020,23 +1086,35 @@ def calculer_scores(
     weights: dict | None = None,
     discipline: str = "PLAT",
     db_weights_by_disc: dict | None = None,
+    auto_weights_by_disc: dict | None = None,
 ) -> list[dict]:
     """
     Calcule les scores pour tous les participants d'une course.
     Utilise des poids différenciés selon la discipline.
+
+    Double scoring :
+      - score_expert : poids Expert (DB scoring_weights ou config)
+      - score_auto   : poids Auto-calibrés (DB calibration_weights) si disponibles
+      - score_global : score_auto si calibré, sinon score_expert
+
     Retourne la liste enrichie avec les scores.
     """
     if not participants:
         return []
 
-    # Choisir les poids selon la discipline
+    # Poids Expert pour cette discipline
     if db_weights_by_disc is not None:
-        w = get_weights_for_discipline(discipline, db_weights_by_disc)
+        w_expert = get_weights_for_discipline(discipline, db_weights_by_disc)
     elif weights is not None:
-        # Compatibilité ascendante : poids globaux fournis
-        w = load_weights_from_config_or_db(weights)
+        w_expert = load_weights_from_config_or_db(weights)
     else:
-        w = get_weights_for_discipline(discipline)
+        w_expert = get_weights_for_discipline(discipline)
+
+    # Poids Auto si disponibles
+    norm_disc = _normalize_discipline(discipline)
+    w_auto = None
+    if auto_weights_by_disc and norm_disc in auto_weights_by_disc:
+        w_auto = auto_weights_by_disc[norm_disc]
 
     hist = historique_hippodromes or {}
     is_trot = _is_trot(discipline)
@@ -1087,60 +1165,31 @@ def calculer_scores(
             s_regularite = score_regularite_trot(musique)
             s_recence = score_recence_trot(musique)
 
-        # Calcul du score global selon les poids de la discipline
-        score_global = 0.0
+        # ── Calcul du score Expert (poids manuels) ──────────────────────────
+        _kwargs = dict(
+            s_forme=s_forme, s_cote=s_cote, s_jockey=s_jockey,
+            s_entraineur=s_entraineur, s_distance=s_distance,
+            s_terrain=s_terrain, s_repos=s_repos, s_partants=s_partants,
+            s_hippodrome=s_hippodrome, s_gains=s_gains, s_age=s_age,
+            s_corde=s_corde, s_regularite=s_regularite, s_recence=s_recence,
+            is_trot=is_trot, is_obstacle=is_obstacle,
+        )
+        sg_expert = _compute_score_with_weights(w_expert, **_kwargs)
 
-        if is_trot:
-            # Critères trot — value_cote renommé en interne mais same key
-            score_global = round(
-                s_forme        * w.get("forme_recente", 0.24)
-                + s_cote       * w.get("value_cote",    0.17)
-                + s_corde      * w.get("corde",         0.14)
-                + s_regularite * w.get("regularite",    0.11)
-                + s_gains      * w.get("gains",         0.08)
-                + s_recence    * w.get("recence",       0.07)
-                + s_entraineur * w.get("entraineur",    0.06)
-                + s_distance   * w.get("distance",      0.05)
-                + s_age        * w.get("age",           0.04)
-                + s_partants   * w.get("partants",      0.04)
-                + s_hippodrome * w.get("hippodrome",    0.0),
-                2,
-            )
-        elif is_obstacle:
-            # Critères obstacle
-            score_global = round(
-                s_forme        * w.get("forme_recente", 0.30)
-                + s_cote       * w.get("value_cote",    0.18)
-                + s_jockey     * w.get("jockey",        0.14)
-                + s_terrain    * w.get("terrain",       0.12)
-                + s_entraineur * w.get("entraineur",    0.08)
-                + s_distance   * w.get("distance",      0.07)
-                + s_gains      * w.get("gains",         0.05)
-                + s_age        * w.get("age",           0.03)
-                + s_partants   * w.get("partants",      0.03)
-                + s_hippodrome * w.get("hippodrome",    0.0),
-                2,
-            )
+        # ── Calcul du score Auto-calibré (si poids disponibles) ──────────
+        if w_auto:
+            sg_auto = _compute_score_with_weights(w_auto, **_kwargs)
         else:
-            # Plat (défaut)
-            score_global = round(
-                s_forme        * w.get("forme_recente", 0.28)
-                + s_cote       * w.get("value_cote",    0.20)
-                + s_jockey     * w.get("jockey",        0.10)
-                + s_entraineur * w.get("entraineur",    0.08)
-                + s_distance   * w.get("distance",      0.07)
-                + s_terrain    * w.get("terrain",       0.06)
-                + s_repos      * w.get("repos",         0.05)
-                + s_gains      * w.get("gains",         0.07)
-                + s_age        * w.get("age",           0.04)
-                + s_partants   * w.get("partants",      0.03)
-                + s_hippodrome * w.get("hippodrome",    0.02),
-                2,
-            )
+            sg_auto = sg_expert  # fallback
+
+        # ── Score principal = Auto si calibré, sinon Expert ──────────────
+        score_global = sg_auto if w_auto else sg_expert
 
         # ── Bonus outsider (4 critères, plafonné 30 pts) ────────────────────
         s_outsider = score_outsider_signals(p, cote, p.get("cote_initiale"), discipline=discipline)
         score_global = round(score_global + s_outsider, 2)
+        sg_expert_final = round(sg_expert + s_outsider, 2)
+        sg_auto_final = round(sg_auto + s_outsider, 2)
 
         is_vb = is_value_bet(cote, score_global)
         confiance = get_confiance(score_global)
@@ -1174,6 +1223,10 @@ def calculer_scores(
             "score_recence":    round(s_recence, 2),
             # F4 : bonus outsider
             "score_outsider":   round(s_outsider, 2),
+            # F5 : double scoring
+            "score_expert":     sg_expert_final,
+            "score_auto":       sg_auto_final,
+            "scoring_mode":     "auto" if w_auto else "expert",
             "is_value_bet":     is_vb,
             "confiance":        confiance,
             "explication":      explication,

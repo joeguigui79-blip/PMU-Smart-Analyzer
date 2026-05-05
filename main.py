@@ -11,6 +11,7 @@ from app.routers import courses, dashboard
 from app.routers import bets as bets_router
 from app.routers import scoring as scoring_router
 from app.routers import auth_router
+from app.routers import stats_router
 from app.auth import validate_token, get_token_from_request
 
 logging.basicConfig(
@@ -40,6 +41,11 @@ async def lifespan(app: FastAPI):
                 from app.routers.scoring import optimize_weights
                 await optimize_weights(db)
                 logger.info("Poids optimisés.")
+                # Auto-calibration au démarrage
+                from app.calibration import calibrate_and_store
+                async with AsyncSessionLocal() as db2:
+                    await calibrate_and_store(db2)
+                    logger.info("Auto-calibration des poids effectuée au démarrage.")
     except Exception as e:
         logger.warning("Erreur lors de l'optimisation au démarrage : %s", e)
 
@@ -81,6 +87,7 @@ app.include_router(courses.router)
 app.include_router(dashboard.router)
 app.include_router(bets_router.router)
 app.include_router(scoring_router.router)
+app.include_router(stats_router.router)
 
 # Servir les fichiers statiques
 app.mount("/static", StaticFiles(directory="static"), name="static")

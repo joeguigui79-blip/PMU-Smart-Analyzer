@@ -15,7 +15,8 @@ class Base(DeclarativeBase):
 _REQUIRED_COLUMNS = {
     "courses":      ["statut_resultat"],
     "participants": ["score_repos", "score_partants", "score_hippodrome", "score_poids",
-                     "position_arrivee", "score_corde", "score_regularite", "score_recence"],
+                     "position_arrivee", "score_corde", "score_regularite", "score_recence",
+                     "score_global_expert", "score_global_auto", "score_gains", "score_age"],
 }
 
 
@@ -47,6 +48,12 @@ async def _needs_migration(conn) -> bool:
         )
         row = cursor.fetchone()
         if row and "discipline" not in (row[0] or ""):
+            return True
+        # Vérifier que calibration_weights existe
+        cursor = sync_conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='calibration_weights'")
+        )
+        if cursor.fetchone() is None:
             return True
         return False
 

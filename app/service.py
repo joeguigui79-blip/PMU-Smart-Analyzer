@@ -40,6 +40,13 @@ async def _get_db_weights_by_discipline(db: AsyncSession) -> dict | None:
     return weights_by_disc if weights_by_disc else None
 
 
+async def _get_auto_weights_by_discipline(db: AsyncSession) -> dict | None:
+    """Charge les poids auto-calibrés depuis la table calibration_weights, groupés par discipline."""
+    from app.calibration import get_auto_weights_from_db
+    auto = await get_auto_weights_from_db(db)
+    return auto if auto else None
+
+
 async def load_programme_today(db: AsyncSession) -> bool:
     """
     Charge le programme du jour depuis l'API PMU si pas déjà en base.
@@ -129,6 +136,7 @@ async def load_participants_for_course(db: AsyncSession, course: Course, reunion
 
     # Charger les poids depuis DB (par discipline)
     db_weights_by_disc = await _get_db_weights_by_discipline(db)
+    auto_weights_by_disc = await _get_auto_weights_by_discipline(db)
 
     scored = calculer_scores(
         participants_data,
@@ -139,6 +147,7 @@ async def load_participants_for_course(db: AsyncSession, course: Course, reunion
         hippodrome=reunion.hippodrome_libelle,
         discipline=course.discipline,
         db_weights_by_disc=db_weights_by_disc,
+        auto_weights_by_disc=auto_weights_by_disc,
     )
 
     for p_data in scored:
@@ -173,6 +182,10 @@ async def load_participants_for_course(db: AsyncSession, course: Course, reunion
             score_recence=p_data.get("score_recence", 50.0),
             driver_change=p_data.get("driver_change", False),
             score_outsider=p_data.get("score_outsider", 0.0),
+            score_global_expert=p_data.get("score_expert", p_data["score_global"]),
+            score_global_auto=p_data.get("score_auto", p_data["score_global"]),
+            score_gains=p_data.get("score_gains", 50.0),
+            score_age=p_data.get("score_age", 50.0),
             is_value_bet=p_data["is_value_bet"],
             confiance=p_data["confiance"],
             explication=p_data["explication"],
@@ -236,6 +249,15 @@ async def fetch_and_store_arrivee(db: AsyncSession, course_id: int) -> bool:
 
     # Évaluer les paris liés à cette course
     await evaluer_paris_pour_course(db, course_id)
+
+    # Recalibrer automatiquement les poids auto après chaque arrivée
+    try:
+        from app.calibration import calibrate_and_store
+        await calibrate_and_store(db)
+        logger.info("Auto-calibration des poids effectuée après arrivée course %d", course_id)
+    except Exception as e:
+        logger.warning("Erreur auto-calibration: %s", e)
+
     return True
 
 

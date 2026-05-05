@@ -9,7 +9,7 @@
   <title>PMU Smart Analyzer</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/css/style.css?v=6">
+  <link rel="stylesheet" href="/static/css/style.css?v=7">
 </head>
 <body>
   <div id="app">
@@ -73,6 +73,20 @@
     </div>
 
     <!-- ============================
+         PAGE: STATS AVANCÉES
+         ============================ -->
+    <div id="page-stats" class="page">
+      <div class="top-header">
+        <div class="logo">PMU<span>Smart</span></div>
+        <span class="date-badge">—</span>
+        <button class="logout-btn" onclick="Auth.logout()" title="Déconnexion">⏻</button>
+      </div>
+      <div id="stats-content">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- ============================
          BOTTOM NAVIGATION
          ============================ -->
     <nav class="bottom-nav">
@@ -87,6 +101,10 @@
       <div class="nav-item" data-nav="bets">
         <span class="nav-icon">🎯</span>
         <span>Mes Paris</span>
+      </div>
+      <div class="nav-item" data-nav="stats">
+        <span class="nav-icon">📈</span>
+        <span>Stats</span>
       </div>
     </nav>
 
@@ -113,10 +131,10 @@
 
   <!-- auth.js MUST be first so Auth is available before api.js and app.js -->
   <script src="/static/js/auth.js?v=1"></script>
-  <script src="/static/js/api.js?v=4"></script>
+  <script src="/static/js/api.js?v=5"></script>
   <script src="/static/js/components.js?v=3"></script>
   <script src="/static/js/bets.js?v=3"></script>
-  <script src="/static/js/app.js?v=7"></script>
+  <script src="/static/js/app.js?v=8"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {

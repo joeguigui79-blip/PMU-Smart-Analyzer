@@ -92,6 +92,12 @@ class Participant(Base):
     score_outsider: Mapped[float] = mapped_column(Float, default=0.0)
     # F1 : position d'arrivée
     position_arrivee: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # F5 : double scoring (Expert vs Auto-calibré)
+    score_global_expert: Mapped[float] = mapped_column(Float, default=0.0)
+    score_global_auto: Mapped[float] = mapped_column(Float, default=0.0)
+    # Scores gains et age (stockés pour calibration)
+    score_gains: Mapped[float] = mapped_column(Float, default=50.0)
+    score_age: Mapped[float] = mapped_column(Float, default=50.0)
 
     course: Mapped["Course"] = relationship("Course", back_populates="participants")
 
@@ -130,6 +136,20 @@ class ScoringWeight(Base):
     poids: Mapped[float] = mapped_column(Float, default=0.0)
     precision: Mapped[float] = mapped_column(Float, default=0.0)
     nb_samples: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CalibrationWeight(Base):
+    """Poids auto-calibrés depuis l'historique, par discipline et critère."""
+    __tablename__ = "calibration_weights"
+    __table_args__ = (
+        UniqueConstraint("discipline", "critere", name="uq_calibration_weight_disc_critere"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    discipline: Mapped[str] = mapped_column(String(20), default="PLAT", index=True)
+    critere: Mapped[str] = mapped_column(String(50), index=True)
+    poids: Mapped[float] = mapped_column(Float, default=0.0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
