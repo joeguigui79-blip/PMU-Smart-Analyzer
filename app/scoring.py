@@ -271,19 +271,18 @@ def score_jockey(
     Stratégie :
     1. Analyser la forme moyenne des AUTRES chevaux montés par ce jockey dans la course.
        Un jockey qui a plusieurs chevaux en bonne forme = bon jockey → bonus.
-    2. Si le jockey n'a qu'un seul cheval (cas normal), utiliser 50 comme base neutre
-       car on ne peut pas estimer sa qualité sans données externes.
+    2. Si le jockey n'a qu'un seul cheval (cas normal), score neutre enrichi.
     3. En trot attelé, un driver avec plusieurs chevaux en bonne forme = indicateur fort.
     """
     if not jockey:
-        return 50.0
+        return 40.0
 
     if not participants:
         return 50.0
 
     is_trot = _is_trot(discipline)
 
-    # Trouver les autres chevaux du même jockey/driver dans la course
+    # Méthode 1 : forme des autres chevaux du même jockey (existant)
     other_formes = []
     for p in participants:
         p_jockey = p.get("jockey", "")
@@ -292,29 +291,33 @@ def score_jockey(
             forme = score_forme_recente(p_musique, discipline)
             other_formes.append(forme)
 
-    if not other_formes:
-        # Cas normal : jockey unique → score neutre 50
-        return 50.0
+    # Méthode 2 : fréquence du jockey dans la course (jockey populaire = demandé)
+    nb_montes = sum(1 for j in all_jockeys if j == jockey)
 
-    # Calculer la forme moyenne des autres chevaux du jockey
-    avg_forme = sum(other_formes) / len(other_formes)
+    # Score de base
+    base = 50.0
 
-    # Mapper la forme moyenne en score jockey
-    # Forme moyenne élevée = bon jockey dans ce contexte
-    if avg_forme >= 70:
-        base = 72.0  # Jockey avec d'autres chevaux en excellente forme
-    elif avg_forme >= 60:
-        base = 62.0
-    elif avg_forme >= 50:
-        base = 55.0
-    elif avg_forme >= 40:
-        base = 45.0
-    else:
-        base = 38.0
+    if other_formes:
+        avg_forme = sum(other_formes) / len(other_formes)
+        if avg_forme >= 70:
+            base = 72.0
+        elif avg_forme >= 60:
+            base = 63.0
+        elif avg_forme >= 50:
+            base = 55.0
+        elif avg_forme >= 40:
+            base = 45.0
+        else:
+            base = 38.0
+        if is_trot and len(other_formes) >= 2:
+            base = min(base + 5.0, 80.0)
+    elif nb_montes >= 2:
+        # Jockey avec plusieurs chevaux mais pas assez d'info forme
+        base = 58.0
 
-    # Bonus si le jockey a plusieurs chevaux en bonne forme (en trot surtout)
-    if is_trot and len(other_formes) >= 2:
-        base = min(base + 5.0, 80.0)
+    # Jockey unique sans autres données : score neutre
+    if nb_montes == 1 and not other_formes:
+        base = 50.0
 
     return round(base, 2)
 
@@ -334,56 +337,75 @@ def score_entraineur(entraineur: str, all_entraineurs: list[str]) -> float:
 
 def score_distance(musique: str, distance_course: int, discipline: str = "PLAT") -> float:
     """
-    Score distance (0-100) heuristique amélioré.
+    Score distance (0-100) basé sur les performances passées du cheval.
 
-    Classe les distances en catégories et évalue l'adéquation selon la forme
-    et les victoires enregistrées dans la musique.
+    Classe les distances en catégories et évalue l'adéquation selon les résultats
+    enregistrés dans la musique (victoires et places).
     """
     if not musique or distance_course <= 0:
         return 50.0
 
-    forme = score_forme_recente(musique, discipline)
+    is_trot = _is_trot(discipline)
 
-    # Classement de la distance actuelle
-    if distance_course < 1400:
-        cat_dist = "sprint"
-    elif distance_course < 1800:
-        cat_dist = "mile"
-    elif distance_course < 2400:
-        cat_dist = "intermediaire"
+    # Catégoriser la distance de la course
+    if is_trot:
+        # En trot : courte < 2100m, moyenne 2100-2700m, longue > 2700m
+        if distance_course < 2100:
+            cat_course = "court"
+        elif distance_course <= 2700:
+            cat_course = "moyen"
+        else:
+            cat_course = "long"
     else:
-        cat_dist = "long"
+        # Plat/obstacle
+        if distance_course < 1400:
+            cat_course = "sprint"
+        elif distance_course < 1800:
+            cat_course = "mile"
+        elif distance_course < 2200:
+            cat_course = "intermediaire"
+        elif distance_course < 2800:
+            cat_course = "classique"
+        else:
+            cat_course = "long"
 
-    # Compter les victoires dans la musique
-    nb_victoires = sum(1 for c in musique if c == "1")
-    nb_courses_total = len(_parse_musique(musique, is_trot=_is_trot(discipline)))
+    # Analyser la musique : compter victoires et places
+    scores = _parse_musique(musique, is_trot=is_trot)
+    if not scores:
+        return 50.0
 
-    # Heuristique : bonne forme récente = le cheval s'adapte probablement bien
-    if forme >= 70:
-        # Excellente forme → score élevé quelle que soit la distance
-        score = 68.0
-        # Bonus si la distance est dans la plage "classique" (pas extrême)
-        if cat_dist in ("mile", "intermediaire"):
-            score += 5.0
-    elif forme >= 55:
-        score = 55.0
-        if cat_dist in ("mile", "intermediaire"):
-            score += 5.0
+    nb_courses = len(scores)
+    nb_top3 = sum(1 for s in scores if s >= 65)  # score >= 65 = place 1-3
+    nb_victoires = sum(1 for s in scores if s >= 100)
+
+    # Score de base selon le taux de réussite global
+    if nb_courses >= 3:
+        taux_top3 = nb_top3 / nb_courses
+        if taux_top3 >= 0.5:
+            base = 75.0
+        elif taux_top3 >= 0.3:
+            base = 62.0
+        elif taux_top3 >= 0.15:
+            base = 50.0
+        else:
+            base = 38.0
     else:
-        score = 42.0
-        # Pénaliser les distances extrêmes pour les chevaux en mauvaise forme
-        if cat_dist in ("sprint", "long"):
-            score -= 5.0
+        base = 50.0
 
-    # Bonus si le cheval a des victoires : probablement adapté aux distances courues
-    if nb_victoires >= 2:
-        score = min(score + 5.0, 80.0)
-    elif nb_victoires == 0 and nb_courses_total >= 5:
-        # Cheval sans victoire récente : légère pénalité sur distance longue
-        if cat_dist == "long":
-            score = max(score - 5.0, 30.0)
+    # Ajustement selon la catégorie de distance (heuristique)
+    if cat_course in ("sprint", "court"):
+        # Sprint/court : vitesse pure. Un cheval avec des victoires est probablement adapté
+        if nb_victoires >= 2:
+            base = min(base + 8.0, 85.0)
+    elif cat_course in ("long", "classique"):
+        # Long : endurance. Pénaliser si le cheval n'a jamais bien fini
+        if nb_top3 == 0 and nb_courses >= 4:
+            base = max(base - 10.0, 30.0)
+        elif nb_victoires >= 1:
+            base = min(base + 5.0, 80.0)
+    # Mile/intermédiaire/moyen : distances standard, pas d'ajustement spécial
 
-    return round(score, 2)
+    return round(base, 2)
 
 
 def score_terrain(musique: str, terrain_course: str, penetrometre: float | None, discipline: str = "PLAT") -> float:
@@ -391,9 +413,10 @@ def score_terrain(musique: str, terrain_course: str, penetrometre: float | None,
     Score terrain (0-100) heuristique amélioré avec pénétromètre intelligent.
 
     Logique :
-    - Terrain lourd (> 4.0) : favorise les endurants (bonne forme longue distance)
-    - Terrain léger (< 2.5) : favorise les rapides (bonnes positions récentes)
-    - Terrain moyen (2.5-4.0) : neutre, avantage si forme récente bonne
+    - Terrain lourd (pénétromètre >= 4.5) : très discriminant, seuls les endurants s'en sortent
+    - Terrain souple (>= 3.5) : légèrement discriminant
+    - Terrain léger (< 2.0) : avantage aux chevaux rapides (bonne forme récente)
+    - Terrain bon (2.0-3.5) : neutre, léger avantage si bonne forme
     """
     if not musique:
         return 50.0
@@ -401,38 +424,62 @@ def score_terrain(musique: str, terrain_course: str, penetrometre: float | None,
     forme = score_forme_recente(musique, discipline)
     is_obstacle = _is_obstacle(discipline)
 
-    # Base selon le pénétromètre
+    # Classifier le terrain
     if penetrometre is not None:
-        if penetrometre > 4.5:
-            # Terrain très lourd : les endurants sont avantagés
-            # Pénaliser les chevaux sans victoires récentes
-            if forme >= 65:
-                base = 55.0  # Bonne forme = s'adapte
-            else:
-                base = 40.0  # Mauvaise forme sur lourd = risqué
-            # En obstacle, terrain lourd est très discriminant
-            if is_obstacle:
-                base = max(base - 5.0, 25.0) if forme < 60 else base + 5.0
-        elif penetrometre > 3.5:
-            # Lourd à souple
-            base = 50.0 + (forme - 50) * 0.15
-        elif penetrometre >= 2.5:
-            # Terrain moyen (BON_A_SOUPLE, SOUPLE) : neutre
-            base = 52.0 + (forme - 50) * 0.12
-        elif penetrometre >= 1.5:
-            # Terrain léger à bon : favorise les chevaux rapides
-            if forme >= 65:
-                base = 60.0
-            else:
-                base = 48.0
+        if penetrometre >= 4.5:
+            terrain_cat = "lourd"
+        elif penetrometre >= 3.5:
+            terrain_cat = "souple"
+        elif penetrometre >= 2.0:
+            terrain_cat = "bon"
         else:
-            # Très léger (piste rapide)
-            base = 55.0 + (forme - 50) * 0.1
+            terrain_cat = "leger"
     else:
-        # Pas de pénétromètre : neutre avec léger bonus si bonne forme
-        base = 50.0 + (forme - 50) * 0.1
+        terrain_cat = "bon"  # défaut neutre
 
-    return round(max(20.0, min(80.0, base)), 2)
+    # Score basé sur la combinaison forme + terrain
+    if terrain_cat == "lourd":
+        # Terrain lourd : très discriminant
+        if forme >= 70:
+            base = 68.0
+        elif forme >= 55:
+            base = 50.0
+        elif forme >= 40:
+            base = 35.0
+        else:
+            base = 22.0
+        # En obstacle, terrain lourd encore plus impactant
+        if is_obstacle:
+            if forme >= 65:
+                base = min(base + 8.0, 80.0)
+            else:
+                base = max(base - 8.0, 18.0)
+    elif terrain_cat == "souple":
+        # Terrain souple : légèrement discriminant
+        if forme >= 65:
+            base = 60.0
+        elif forme >= 50:
+            base = 50.0
+        else:
+            base = 38.0
+    elif terrain_cat == "leger":
+        # Terrain léger/rapide : avantage aux chevaux rapides
+        if forme >= 70:
+            base = 70.0
+        elif forme >= 55:
+            base = 58.0
+        else:
+            base = 42.0
+    else:
+        # Bon terrain : neutre, léger avantage si bonne forme
+        if forme >= 65:
+            base = 58.0
+        elif forme >= 50:
+            base = 52.0
+        else:
+            base = 44.0
+
+    return round(base, 2)
 
 
 def score_repos(musique: str, jours_depuis_sortie: int | None = None, discipline: str = "PLAT") -> float:
