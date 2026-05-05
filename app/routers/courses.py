@@ -60,7 +60,9 @@ async def get_course(course_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Course introuvable")
 
     await load_participants_for_course(db, course, course.reunion)
-    if course.statut_resultat != 'TERMINE':
+    # Tenter de récupérer les arrivées si pas encore de positions en DB
+    has_positions = any(p.position_arrivee is not None for p in course.participants)
+    if not has_positions:
         await fetch_and_store_arrivee(db, course.id)
 
     await db.refresh(course)
