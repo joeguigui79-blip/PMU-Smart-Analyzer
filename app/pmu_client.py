@@ -221,38 +221,37 @@ class PMUClient:
         """
         Extrait ordreArrivee depuis le programme du jour ou l'endpoint participants.
         """
-        # Cas 1 : chercher dans le programme global (fonctionne pour la R1 / plat)
-        url = f"{PMU_BASE_URL}/{date_str}"
+        # Cas 1 : appeler /programme/{date}/R{reunion} qui contient ordreArrivee au niveau course
+        url = f"{PMU_BASE_URL}/{date_str}/R{reunion_num}"
         try:
             resp = await self._client.get(url)
             resp.raise_for_status()
             data = resp.json()
-            programme = data.get("programme", data)
-            for r in programme.get("reunions", []):
-                if r.get("numOfficiel") != reunion_num:
+            # La réponse peut être directement la réunion ou dans un wrapper
+            reunion_data = data.get("reunion", data)
+            courses_list = reunion_data.get("courses", [])
+            for c in courses_list:
+                if c.get("numExterne") != course_num and c.get("numOrdre") != course_num:
                     continue
-                for c in r.get("courses", []):
-                    if c.get("numExterne") != course_num:
-                        continue
-                    ordre = c.get("ordreArrivee")
-                    if isinstance(ordre, list) and ordre:
-                        result = []
-                        for position, item in enumerate(ordre, start=1):
-                            if isinstance(item, list):
-                                num = item[0] if item else None
-                            else:
-                                num = item
-                            if num is not None:
-                                try:
-                                    result.append({"numero_cheval": int(num), "position": position})
-                                except (ValueError, TypeError):
-                                    pass
-                        if result:
-                            return result
+                ordre = c.get("ordreArrivee")
+                if isinstance(ordre, list) and ordre:
+                    result = []
+                    for position, item in enumerate(ordre, start=1):
+                        if isinstance(item, list):
+                            num = item[0] if item else None
+                        else:
+                            num = item
+                        if num is not None:
+                            try:
+                                result.append({"numero_cheval": int(num), "position": position})
+                            except (ValueError, TypeError):
+                                pass
+                    if result:
+                        return result
         except Exception as e:
-            logger.warning("PMU programme (arrivee) error: %s", e)
+            logger.warning("PMU programme/R%d (arrivee) error: %s", reunion_num, e)
 
-        # Cas 2 : fallback — appel direct à l'endpoint participants (trot et réunions non incluses dans /programme)
+        # Cas 2 : fallback — appel direct à l'endpoint participants
         participants_url = PMU_PARTICIPANTS_URL.format(
             date=date_str, reunion=reunion_num, course=course_num
         )
