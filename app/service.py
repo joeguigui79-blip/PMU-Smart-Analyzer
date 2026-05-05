@@ -17,8 +17,10 @@ from app.config import today_str
 STATUTS_TERMINES = frozenset({
     "FIN_COURSE",
     "ARRIVEE_DEFINITIVE",
+    "ARRIVEE_DEFINITIVE_COMPLETE",
     "COURSE_ARRIVEE",
     "ARRIVEE_PROVISOIRE",
+    "TERMINE",
 })
 
 logger = logging.getLogger(__name__)
