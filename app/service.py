@@ -122,78 +122,53 @@ async def load_programme_today(db: AsyncSession) -> bool:
 
 async def refresh_programme_statuts(db: AsyncSession) -> int:
     """
-    Met à jour statut_resultat pour les courses du jour dont le statut PMU
-    indique qu'elles sont terminées mais qui n'ont pas encore statut_resultat='TERMINE'.
-    Retourne le nombre de courses mises à jour.
+    Met à jour statut_resultat pour les courses du jour et récupère les arrivées manquantes.
     """
     date_str = today_str()
 
-    # Récupérer les courses du jour qui ne sont pas encore marquées TERMINE
-    result = await db.execute(
+    # Récupérer TOUTES les courses du jour qui n'ont pas encore de positions d'arrivée
+    all_courses_result = await db.execute(
         select(Course)
         .join(Reunion)
-        .where(
-            Reunion.date_str == date_str,
-            Course.statut_resultat != "TERMINE",
-            Course.statut.in_(STATUTS_TERMINES),
-        )
+        .where(Reunion.date_str == date_str)
     )
-    courses = result.scalars().all()
+    all_courses = all_courses_result.scalars().all()
 
-    if not courses:
+    if not all_courses:
         return 0
 
-    # Récupérer le programme frais depuis l'API PMU
-    data = await pmu_client.get_programme(date_str)
-    # Construire un index num_externe -> statut depuis les données API
-    statuts_api: dict[int, str] = {}
-    for r in data.get("reunions", []):
-        for c in r.get("courses", []):
-            statuts_api[c["num_externe"]] = c.get("statut", "")
-
     updated = 0
-    for course in courses:
-        statut_frais = statuts_api.get(course.num_externe, course.statut)
-        if statut_frais in STATUTS_TERMINES and course.statut_resultat != "TERMINE":
-            course.statut = statut_frais
-            updated += 1
-            # Essayer de récupérer les positions d'arrivée (fetch_and_store_arrivee fait le commit)
-            try:
-                got_arrivee = await fetch_and_store_arrivee(db, course.id)
-                if not got_arrivee:
-                    # Arrivée pas encore dispo dans l'API, juste marquer TERMINE
-                    course.statut_resultat = "TERMINE"
-            except Exception as e:
-                logger.warning("Erreur récup arrivée course %d: %s", course.id, e)
-                course.statut_resultat = "TERMINE"
-
-    if updated:
-        await db.commit()
-        logger.info("refresh_programme_statuts : %d cours(es) marquée(s) TERMINE", updated)
-
-    # --- 2e passe : rattraper les courses déjà TERMINE sans positions d'arrivée ---
-    missing_result = await db.execute(
-        select(Course)
-        .join(Reunion)
-        .where(
-            Reunion.date_str == date_str,
-            Course.statut_resultat == "TERMINE",
-        )
-    )
-    missing_courses = missing_result.scalars().all()
-
-    for course in missing_courses:
+    for course in all_courses:
+        # Vérifier si cette course a déjà des positions d'arrivée
         p_check = await db.execute(
             select(Participant).where(
                 Participant.course_id == course.id,
                 Participant.position_arrivee.isnot(None),
             ).limit(1)
         )
-        if p_check.scalar_one_or_none() is None:
-            try:
-                await fetch_and_store_arrivee(db, course.id)
-            except Exception as e:
-                logger.warning("Retry arrivée course %d: %s", course.id, e)
+        has_positions = p_check.scalar_one_or_none() is not None
+
+        if has_positions:
+            # S'assurer que le statut est TERMINE
+            if course.statut_resultat != "TERMINE":
+                course.statut_resultat = "TERMINE"
+                updated += 1
+            continue
+
+        # Pas de positions → tenter de récupérer les arrivées
+        try:
+            got_arrivee = await fetch_and_store_arrivee(db, course.id)
+            if got_arrivee:
+                updated += 1
+            elif course.statut in STATUTS_TERMINES and course.statut_resultat != "TERMINE":
+                course.statut_resultat = "TERMINE"
+                updated += 1
+        except Exception as e:
+            logger.warning("Erreur récup arrivée course %d: %s", course.id, e)
+
+    if updated:
+        await db.commit()
+        logger.info("refresh_programme_statuts : %d cours(es) mises à jour", updated)
 
     return updated
 
