@@ -938,6 +938,10 @@ def score_outsider_signals(
     seuil_cote = 10.0 if discipline == "PLAT" else 6.0
     plafond = 15.0 if discipline == "PLAT" else 30.0
 
+    # Bonus outsider désactivé pour le PLAT (scoring classique Expert uniquement)
+    if discipline == "PLAT":
+        return 0.0
+
     # Garde : seulement pour les outsiders
     if cote_actuelle is None or cote_actuelle <= seuil_cote:
         return 0.0
