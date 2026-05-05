@@ -373,11 +373,8 @@ async function showCourse(courseId) {
   document.getElementById("page-course-back-btn").style.display = "flex";
 
   try {
-    const [course, suggestions] = await Promise.all([
-      API.course(courseId),
-      API.courseSuggestions(courseId).catch(function () { return null; }),
-    ]);
-    renderCourseDetail(course, suggestions);
+    const course = await API.course(courseId);
+    renderCourseDetail(course, null);
   } catch (e) {
     content.innerHTML = "<div class='empty-state'><div class='empty-icon'>⚠️</div><div class='empty-title'>Erreur de chargement</div></div>";
     showToast("Impossible de charger cette course", true);
@@ -428,10 +425,10 @@ function renderCourseDetail(course, suggestions) {
 
   html += "</div>";
 
-  // F3 : Suggestions IA
-  if (suggestions && (suggestions.couple || suggestions.tierce || suggestions.deux_sur_quatre)) {
-    html += renderSuggestions(suggestions, course);
-  }
+  // F3 : Suggestions IA — désactivé (affichage masqué)
+  // if (suggestions && (suggestions.couple || suggestions.tierce || suggestions.deux_sur_quatre)) {
+  //   html += renderSuggestions(suggestions, course);
+  // }
 
   if (course.top_pick) {
     const p = course.top_pick;
