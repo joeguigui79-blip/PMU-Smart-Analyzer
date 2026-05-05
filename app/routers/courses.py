@@ -9,7 +9,7 @@ from app.schemas import (
     CourseSchema, CourseDetailSchema, ReunionSchema, ParticipantSchema,
     CourseSuggestionsSchema,
 )
-from app.service import load_programme_today, load_participants_for_course, fetch_and_store_arrivee
+from app.service import load_programme_today, load_participants_for_course, fetch_and_store_arrivee, refresh_programme_statuts
 from app.config import today_str
 
 router = APIRouter(prefix="/api", tags=["courses"])
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api", tags=["courses"])
 async def list_reunions(db: AsyncSession = Depends(get_db)):
     """Liste toutes les réunions du jour avec leurs courses."""
     await load_programme_today(db)
+    await refresh_programme_statuts(db)
     date_str = today_str()
     result = await db.execute(
         select(Reunion)
@@ -34,6 +35,7 @@ async def list_reunions(db: AsyncSession = Depends(get_db)):
 async def list_courses(db: AsyncSession = Depends(get_db)):
     """Liste toutes les courses du jour."""
     await load_programme_today(db)
+    await refresh_programme_statuts(db)
     date_str = today_str()
     result = await db.execute(
         select(Course)

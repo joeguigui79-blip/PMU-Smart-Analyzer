@@ -13,6 +13,14 @@ from app.pmu_client import pmu_client
 from app.scoring import calculer_scores, load_weights_from_config_or_db
 from app.config import today_str
 
+# Statuts PMU qui indiquent qu'une course est terminée
+STATUTS_TERMINES = frozenset({
+    "FIN_COURSE",
+    "ARRIVEE_DEFINITIVE",
+    "COURSE_ARRIVEE",
+    "ARRIVEE_PROVISOIRE",
+})
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,6 +89,8 @@ async def load_programme_today(db: AsyncSession) -> bool:
         await db.flush()
 
         for c_data in r_data.get("courses", []):
+            statut_pmu = c_data.get("statut", "")
+            statut_resultat = "TERMINE" if statut_pmu in STATUTS_TERMINES else "EN_COURS"
             course = Course(
                 reunion_id=reunion.id,
                 num_ordre=c_data["num_ordre"],
@@ -95,16 +105,63 @@ async def load_programme_today(db: AsyncSession) -> bool:
                 penetrometre_valeur=c_data["penetrometre_valeur"],
                 nombre_partants=c_data["nombre_partants"],
                 montant_prix=c_data["montant_prix"],
-                statut=c_data["statut"],
+                statut=statut_pmu,
                 condition_age=c_data["condition_age"],
                 condition_sexe=c_data["condition_sexe"],
                 paris_disponibles=",".join(c_data.get("paris_disponibles", [])),
+                statut_resultat=statut_resultat,
             )
             db.add(course)
 
     await db.commit()
     logger.info("Programme chargé : %d réunions", len(reunions_data))
     return True
+
+
+async def refresh_programme_statuts(db: AsyncSession) -> int:
+    """
+    Met à jour statut_resultat pour les courses du jour dont le statut PMU
+    indique qu'elles sont terminées mais qui n'ont pas encore statut_resultat='TERMINE'.
+    Retourne le nombre de courses mises à jour.
+    """
+    date_str = today_str()
+
+    # Récupérer les courses du jour qui ne sont pas encore marquées TERMINE
+    result = await db.execute(
+        select(Course)
+        .join(Reunion)
+        .where(
+            Reunion.date_str == date_str,
+            Course.statut_resultat != "TERMINE",
+            Course.statut.in_(STATUTS_TERMINES),
+        )
+    )
+    courses = result.scalars().all()
+
+    if not courses:
+        return 0
+
+    # Récupérer le programme frais depuis l'API PMU
+    data = await pmu_client.get_programme(date_str)
+    # Construire un index num_externe -> statut depuis les données API
+    statuts_api: dict[int, str] = {}
+    for r in data.get("reunions", []):
+        for c in r.get("courses", []):
+            statuts_api[c["num_externe"]] = c.get("statut", "")
+
+    updated = 0
+    for course in courses:
+        statut_frais = statuts_api.get(course.num_externe, course.statut)
+        if statut_frais in STATUTS_TERMINES and course.statut_resultat != "TERMINE":
+            course.statut = statut_frais
+            course.statut_resultat = "TERMINE"
+            updated += 1
+
+    if updated:
+        await db.commit()
+        logger.info("refresh_programme_statuts : %d cours(es) marquée(s) TERMINE", updated)
+
+    return updated
 
 
 async def load_participants_for_course(db: AsyncSession, course: Course, reunion: Reunion) -> bool:
