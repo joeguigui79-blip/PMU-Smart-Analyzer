@@ -87,6 +87,9 @@ class Participant(Base):
     is_value_bet: Mapped[bool] = mapped_column(Boolean, default=False)
     confiance: Mapped[str] = mapped_column(String(10), default="LOW")  # HIGH / MEDIUM / LOW
     explication: Mapped[str] = mapped_column(Text, default="")
+    # F4 : outsider signals
+    driver_change: Mapped[bool] = mapped_column(Boolean, default=False)
+    score_outsider: Mapped[float] = mapped_column(Float, default=0.0)
     # F1 : position d'arrivée
     position_arrivee: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

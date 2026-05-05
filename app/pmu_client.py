@@ -157,6 +157,7 @@ class PMUClient:
                 "nombre_courses": p.get("nombreCourses", 0) or 0,
                 "nombre_victoires": p.get("nombreVictoires", 0) or 0,
                 "nombre_places": p.get("nombrePlaces", 0) or 0,
+                "driver_change": bool(p.get("driverChange", False)),
             })
 
         return participants

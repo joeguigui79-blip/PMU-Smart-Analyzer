@@ -887,6 +887,123 @@ def load_weights_from_config_or_db(db_weights: dict | None = None) -> dict:
     return SCORING_WEIGHTS.copy()
 
 
+def _parse_positions_recentes(musique: str, nb: int = 5) -> list[int | None]:
+    """
+    Retourne les `nb` dernières positions numériques réelles (1-9 ou 10+→10)
+    en ignorant les codes spéciaux (D/A/R/N/T) et les suffixes de discipline.
+    Le plus récent en premier.
+    """
+    positions: list[int | None] = []
+    i = 0
+    while i < len(musique) and len(positions) < nb:
+        char = musique[i]
+        if char == "(":
+            while i < len(musique) and musique[i] != ")":
+                i += 1
+            i += 1
+            continue
+        if char.isdigit():
+            num = char
+            if i + 1 < len(musique) and musique[i + 1].isdigit():
+                num = char + musique[i + 1]
+                i += 1
+            pos = int(num)
+            if pos == 0:
+                pos = 10  # "0" dans musique = 10e+
+            positions.append(pos)
+            if i + 1 < len(musique) and musique[i + 1].lower() in ("a", "m", "p", "s"):
+                i += 1
+        i += 1
+    return positions
+
+
+def score_outsider_signals(
+    participant: dict,
+    cote_actuelle: float | None,
+    cote_initiale: float | None,
+) -> float:
+    """
+    Calcule un bonus outsider (0-30 points) cumulant 4 critères :
+
+    1. Variation de cote (baisse > 20% = argent informé)          → 0 à +15 pts
+    2. Changement de driver/jockey sur un outsider (cote > 10)    → 0 à +12 pts
+    3. Progression dans la musique (dernières 5 positions)         → 0 à +12 pts
+    4. Ratio victoires ou top3 / courses si sous-évalué            → 0 à +10 pts
+
+    Le bonus n'est appliqué que si cote_actuelle > 6 (outsider).
+    Le total est plafonné à 30 points.
+    """
+    # Garde : seulement pour les outsiders
+    if cote_actuelle is None or cote_actuelle <= 6.0:
+        return 0.0
+
+    bonus = 0.0
+    musique = participant.get("musique", "") or ""
+
+    # ── Critère 1 : variation de cote ────────────────────────────────────────
+    if cote_initiale is not None and cote_initiale > 0 and cote_actuelle > 0:
+        variation = (cote_initiale - cote_actuelle) / cote_initiale  # >0 = baisse
+        if variation > 0.20:
+            # Baisse > 20% : argent informé
+            if variation >= 0.50:
+                bonus += 15.0
+            elif variation >= 0.40:
+                bonus += 12.0
+            elif variation >= 0.30:
+                bonus += 9.0
+            else:
+                bonus += 5.0
+
+    # ── Critère 2 : changement de driver/jockey ──────────────────────────────
+    driver_change = participant.get("driver_change", False)
+    if driver_change and cote_actuelle > 10.0:
+        # Signal fort : entraîneur mise sur un meilleur jockey
+        if cote_actuelle > 20.0:
+            bonus += 12.0
+        elif cote_actuelle > 15.0:
+            bonus += 10.0
+        else:
+            bonus += 8.0
+
+    # ── Critère 3 : progression dans la musique ───────────────────────────────
+    if musique:
+        positions = _parse_positions_recentes(musique, nb=5)
+        if len(positions) >= 3:
+            # Comparer la première moitié et la deuxième moitié
+            mid = len(positions) // 2
+            recent_avg = sum(positions[:mid]) / mid          # positions les plus récentes
+            older_avg = sum(positions[mid:]) / (len(positions) - mid)  # plus anciennes
+            progression = older_avg - recent_avg             # >0 = amélioration
+            if progression >= 3.0:
+                bonus += 12.0  # Progression nette (ex: 7→4→2)
+            elif progression >= 1.5:
+                bonus += 7.0
+            elif progression >= 0.5:
+                bonus += 3.0
+        # Bonus additionnel : récente victoire ou place malgré cote haute
+        if len(positions) >= 1 and positions[0] <= 3:
+            # Dernier résultat = top 3 alors que cote > 6
+            bonus += 4.0
+
+    # ── Critère 4 : ratio victoires/courses (sous-évaluation) ────────────────
+    nb_courses = participant.get("nombre_courses", 0) or 0
+    nb_victoires = participant.get("nombre_victoires", 0) or 0
+    nb_places = participant.get("nombre_places", 0) or 0
+
+    if nb_courses >= 3:
+        ratio_win = nb_victoires / nb_courses
+        ratio_top3 = (nb_victoires + nb_places) / nb_courses
+        # Cheval avec bon ratio mais cote élevée = sous-évalué par le marché
+        if ratio_win > 0.15 and cote_actuelle > 8.0:
+            bonus += 10.0
+        elif ratio_win > 0.10 and cote_actuelle > 8.0:
+            bonus += 6.0
+        elif ratio_top3 > 0.35 and cote_actuelle > 8.0:
+            bonus += 4.0
+
+    return round(min(bonus, 30.0), 2)
+
+
 def calculer_scores(
     participants: list[dict],
     distance_course: int,
@@ -1016,6 +1133,10 @@ def calculer_scores(
                 2,
             )
 
+        # ── Bonus outsider (4 critères, plafonné 30 pts) ────────────────────
+        s_outsider = score_outsider_signals(p, cote, p.get("cote_initiale"))
+        score_global = round(score_global + s_outsider, 2)
+
         is_vb = is_value_bet(cote, score_global)
         confiance = get_confiance(score_global)
         explication = generer_explication(
@@ -1042,10 +1163,12 @@ def calculer_scores(
             "score_poids":      round(s_poids, 2),
             "score_gains":      round(s_gains, 2),
             "score_age":        round(s_age, 2),
-            # Nouveaux critères trot
+            # Critères trot
             "score_corde":      round(s_corde, 2),
             "score_regularite": round(s_regularite, 2),
             "score_recence":    round(s_recence, 2),
+            # F4 : bonus outsider
+            "score_outsider":   round(s_outsider, 2),
             "is_value_bet":     is_vb,
             "confiance":        confiance,
             "explication":      explication,

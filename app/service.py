@@ -171,6 +171,8 @@ async def load_participants_for_course(db: AsyncSession, course: Course, reunion
             score_corde=p_data.get("score_corde", 50.0),
             score_regularite=p_data.get("score_regularite", 50.0),
             score_recence=p_data.get("score_recence", 50.0),
+            driver_change=p_data.get("driver_change", False),
+            score_outsider=p_data.get("score_outsider", 0.0),
             is_value_bet=p_data["is_value_bet"],
             confiance=p_data["confiance"],
             explication=p_data["explication"],
