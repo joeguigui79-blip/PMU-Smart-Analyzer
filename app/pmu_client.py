@@ -239,21 +239,37 @@ class PMUClient:
                 if c.get("numExterne") != course_num:
                     continue
                 ordre = c.get("ordreArrivee")
-                if not isinstance(ordre, list) or not ordre:
-                    return None
-                result = []
-                for position, item in enumerate(ordre, start=1):
-                    # item peut être [num_pmu] ou juste num_pmu
-                    if isinstance(item, list):
-                        num = item[0] if item else None
-                    else:
-                        num = item
-                    if num is not None:
-                        try:
-                            result.append({"numero_cheval": int(num), "position": position})
-                        except (ValueError, TypeError):
-                            pass
-                return result if result else None
+                # Cas 1 : PLAT — ordreArrivee est une liste au niveau course
+                if isinstance(ordre, list) and ordre:
+                    result = []
+                    for position, item in enumerate(ordre, start=1):
+                        # item peut être [num_pmu] ou juste num_pmu
+                        if isinstance(item, list):
+                            num = item[0] if item else None
+                        else:
+                            num = item
+                        if num is not None:
+                            try:
+                                result.append({"numero_cheval": int(num), "position": position})
+                            except (ValueError, TypeError):
+                                pass
+                    return result if result else None
+                # Cas 2 : TROT — ordreArrivee est un entier par participant
+                participants_list = c.get("participants", [])
+                if participants_list:
+                    result = []
+                    for p in participants_list:
+                        ordre_p = p.get("ordreArrivee")
+                        num_pmu = p.get("numPmu")
+                        if ordre_p is not None and num_pmu is not None:
+                            try:
+                                result.append({"numero_cheval": int(num_pmu), "position": int(ordre_p)})
+                            except (ValueError, TypeError):
+                                pass
+                    if result:
+                        result.sort(key=lambda x: x["position"])
+                        return result
+                return None
         return None
 
 
