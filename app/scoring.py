@@ -97,6 +97,8 @@ def _normalize_discipline(discipline: str) -> str:
         return "STEEPLE"
     if d in ("CROSS",):
         return "CROSS"
+    if d in ("OBSTACLE",):
+        return "HAIE"
     return "PLAT"
 
 

@@ -12,10 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
-from app.models import Participant, Course, CalibrationWeight
+from app.models import Participant, Course, CalibrationWeight, Reunion
 from app.scoring import _normalize_discipline
 from app.config import SCORING_WEIGHTS_DISCIPLINE
 from app.calibration import calibrate_and_store, get_calibration_status, MIN_COURSES_PAR_DISCIPLINE
+from app.service import refresh_programme_statuts
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["stats"])
@@ -36,6 +37,9 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
       - % top-3 prédits dans le vrai top-3 (Expert et Auto)
       - % top-5 (Expert et Auto)
     """
+    # Rattraper les arrivées manquantes avant de calculer les stats
+    await refresh_programme_statuts(db)
+
     courses_result = await db.execute(
         select(Course).where(Course.statut_resultat == "TERMINE")
     )
