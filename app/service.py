@@ -120,10 +120,22 @@ async def load_programme_today(db: AsyncSession) -> bool:
     return True
 
 
+_last_refresh_time: float = 0.0
+REFRESH_COOLDOWN_SECONDS = 300  # 5 minutes
+
+
 async def refresh_programme_statuts(db: AsyncSession) -> int:
     """
     Met à jour statut_resultat pour les courses du jour et récupère les arrivées manquantes.
+    Ne s'exécute qu'une fois toutes les 5 minutes max.
     """
+    import time
+    global _last_refresh_time
+    now = time.time()
+    if now - _last_refresh_time < REFRESH_COOLDOWN_SECONDS:
+        return 0
+    _last_refresh_time = now
+
     date_str = today_str()
 
     # Récupérer TOUTES les courses du jour qui n'ont pas encore de positions d'arrivée
