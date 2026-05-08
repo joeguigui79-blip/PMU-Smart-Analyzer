@@ -68,7 +68,7 @@ const API = {
   calibrate:        function () { return apiFetch("/api/calibrate", { method: "POST" }); },
 
   // ---- Bilan backtesting ----
-  bilan: function () { return apiFetch("/api/bilan"); },
+  bilan: function (periode) { return apiFetch("/api/bilan?periode=" + (periode || "all")); },
 };
 
 window.API = API;

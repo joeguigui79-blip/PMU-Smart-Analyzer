@@ -26,12 +26,16 @@ Seules les courses avec des position_arrivee renseignées sont prises en compte.
 """
 import json
 import logging
-from fastapi import APIRouter, Depends
+from datetime import datetime, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
-from app.models import Course, Participant
+from app.models import Course, Participant, Reunion
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["bilan"])
@@ -231,28 +235,34 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
 
 
 @router.get("/api/bilan")
-async def get_bilan(db: AsyncSession = Depends(get_db)):
+async def get_bilan(
+    periode: Optional[str] = Query(default="all", description="today|7days|30days|month|all"),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Retourne le bilan de backtesting pour chaque type de pari et chaque mode de scoring.
-
-    Réponse :
-    {
-      "total_courses": int,
-      "paris": {
-        "GAGNANT": {
-          "label": "Gagnant",
-          "auto":    { "evaluees": N, "gagnes": K },
-          "expert":  { "evaluees": N, "gagnes": K },
-          "sans_cote": { "evaluees": N, "gagnes": K }
-        },
-        ...
-      }
-    }
+    Filtre par période : today, 7days, 30days, month, all.
     """
-    # Récupérer toutes les courses terminées
-    courses_result = await db.execute(
-        select(Course).where(Course.statut_resultat == "TERMINE")
-    )
+    # Déterminer la date de début selon la période
+    paris_tz = ZoneInfo("Europe/Paris")
+    now = datetime.now(paris_tz)
+    date_from: Optional[str] = None
+
+    if periode == "today":
+        date_from = now.strftime("%d%m%Y")
+    elif periode == "7days":
+        date_from = (now - timedelta(days=7)).strftime("%d%m%Y")
+    elif periode == "30days":
+        date_from = (now - timedelta(days=30)).strftime("%d%m%Y")
+    elif periode == "month":
+        date_from = now.replace(day=1).strftime("%d%m%Y")
+    # else: all — pas de filtre
+
+    # Récupérer les courses terminées avec filtre date
+    query = select(Course).join(Reunion).where(Course.statut_resultat == "TERMINE")
+    if date_from:
+        query = query.where(Reunion.date_str >= date_from)
+    courses_result = await db.execute(query)
     courses = courses_result.scalars().all()
 
     # Initialiser les compteurs

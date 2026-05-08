@@ -1301,14 +1301,16 @@ window.doCalibrate = doCalibrate;
 // =============================================================================
 
 var _bilanData = null;
+var _bilanPeriode = "all";
 
-async function loadBilanPage() {
+async function loadBilanPage(periode) {
+  if (periode !== undefined) _bilanPeriode = periode;
   var container = document.getElementById("bilan-content");
   if (!container) return;
   container.innerHTML = '<div class="stats-loading"><div class="spinner"></div><p>Calcul du bilan en cours\u2026</p></div>';
 
   try {
-    _bilanData = await API.bilan();
+    _bilanData = await API.bilan(_bilanPeriode);
     container.innerHTML = renderBilanPage(_bilanData);
   } catch (e) {
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement du bilan.<br>' + (e.message || "") + "</div>";
@@ -1325,6 +1327,21 @@ function renderBilanPage(data) {
   html += '<div class="stats-header">';
   html += '<h2 class="stats-title">Bilan &mdash; Backtesting</h2>';
   html += '<p class="stats-subtitle">Simulation des paris sur les courses termin\u00e9es</p>';
+  html += '</div>';
+
+  // Filtre période
+  var periodes = [
+    {key: "today", label: "Ce jour"},
+    {key: "7days", label: "7 derniers jours"},
+    {key: "30days", label: "30 derniers jours"},
+    {key: "month", label: "Ce mois"},
+    {key: "all", label: "Depuis le d\u00e9but"}
+  ];
+  html += '<div class="scoring-toggle" style="margin-bottom:16px;">';
+  for (var i = 0; i < periodes.length; i++) {
+    var p = periodes[i];
+    html += '<button class="scoring-toggle-btn' + (_bilanPeriode === p.key ? ' active' : '') + '" onclick="loadBilanPage(\'' + p.key + '\')">' + p.label + '</button>';
+  }
   html += '</div>';
 
   // Résumé
