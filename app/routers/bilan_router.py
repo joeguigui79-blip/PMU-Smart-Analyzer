@@ -61,20 +61,20 @@ PARIS_LABELS = {
 
 # Alias supplémentaires pour la correspondance avec paris_disponibles
 PARIS_ALIASES: dict[str, list[str]] = {
-    "GAGNANT":        ["GAGNANT", "gagnant", "E_SIMPLE_GAGNANT"],
-    "PLACE":          ["PLACE", "place", "E_SIMPLE_PLACE"],
-    "COUPLE_GAGNANT": ["COUPLE_GAGNANT", "couple_gagnant", "COUPLE", "couple"],
-    "COUPLE_PLACE":   ["COUPLE_PLACE", "couple_place"],
-    "COUPLE_ORDRE":   ["COUPLE_ORDRE", "couple_ordre"],
-    "TIERCE":         ["TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
-    "QUARTE":         ["QUARTE", "quarte", "QUARTE_PLUS", "QUARTE+"],
-    "QUINTE":         ["QUINTE", "quinte", "QUINTE_PLUS", "QUINTE+"],
-    "DEUX_SUR_QUATRE": ["DEUX_SUR_QUATRE", "2sur4", "2SUR4"],
-    "MULTI_4":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
-    "MULTI_5":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
-    "MULTI_6":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
-    "MULTI_7":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
-    "TRIO":           ["TRIO", "trio"],
+    "GAGNANT":        ["SIMPLE_GAGNANT", "E_SIMPLE_GAGNANT", "GAGNANT", "gagnant"],
+    "PLACE":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "COUPLE_GAGNANT": ["COUPLE_GAGNANT", "E_COUPLE_GAGNANT", "couple_gagnant", "COUPLE", "couple"],
+    "COUPLE_PLACE":   ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    "COUPLE_ORDRE":   ["COUPLE_ORDRE", "E_COUPLE_ORDRE", "couple_ordre"],
+    "TIERCE":         ["TIERCE", "E_TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
+    "QUARTE":         ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "quarte", "QUARTE+"],
+    "QUINTE":         ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "quinte", "QUINTE+"],
+    "DEUX_SUR_QUATRE": ["DEUX_SUR_QUATRE", "E_DEUX_SUR_QUATRE", "2sur4", "2SUR4"],
+    "MULTI_4":        ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
+    "MULTI_5":        ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
+    "MULTI_6":        ["MULTI", "E_MULTI"],
+    "MULTI_7":        ["MULTI", "E_MULTI"],
+    "TRIO":           ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
 }
 
 MODES = ["auto", "expert", "sans_cote"]
