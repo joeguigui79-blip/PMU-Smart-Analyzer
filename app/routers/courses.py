@@ -41,7 +41,7 @@ async def list_courses(db: AsyncSession = Depends(get_db)):
         select(Course)
         .join(Reunion)
         .where(Reunion.date_str == date_str)
-        .order_by(Course.heure_depart, Course.id)
+        .order_by(Reunion.num_officiel, Course.num_externe)
     )
     courses = result.scalars().all()
     return courses
