@@ -20,11 +20,9 @@ class Base(DeclarativeBase):
 
 
 async def init_db():
-    """Crée les tables. Drop et recrée si nécessaire (migration simplifiée)."""
+    """Crée les tables si elles n'existent pas."""
     from app import models  # noqa: F401
     async with engine.begin() as conn:
-        # Drop all pour recréer avec les bons types (migration SQLite→PostgreSQL)
-        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     await seed_scoring_weights()
 
