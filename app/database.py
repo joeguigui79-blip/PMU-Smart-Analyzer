@@ -3,7 +3,11 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import DATABASE_URL, SCORING_WEIGHTS_DISCIPLINE
 
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+# statement_cache_size=0 requis pour Supabase (PgBouncer ne supporte pas les prepared statements)
+connect_args = {}
+if "postgresql" in DATABASE_URL or "postgres" in DATABASE_URL:
+    connect_args = {"statement_cache_size": 0}
+engine = create_async_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
