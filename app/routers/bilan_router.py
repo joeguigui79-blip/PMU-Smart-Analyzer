@@ -15,7 +15,10 @@ Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Quarte+       : top4 tous dans top4
   - Quinte+       : top5 tous dans top5
   - 2sur4         : top2 tous dans top4
-  - Multi         : top4 tous dans top4
+  - Multi en 4    : top4 tous dans top4
+  - Multi en 5    : top5, au moins 4 dans top4
+  - Multi en 6    : top6, au moins 4 dans top4
+  - Multi en 7    : top7, au moins 4 dans top4
   - Trio          : top3 tous dans top3
 
 Seuls les paris présents dans course.paris_disponibles sont comptabilisés.
@@ -45,7 +48,10 @@ PARIS_LABELS = {
     "QUARTE":         "Quarté+",
     "QUINTE":         "Quinté+",
     "DEUX_SUR_QUATRE": "2sur4",
-    "MULTI":          "Multi",
+    "MULTI_4":        "Multi en 4",
+    "MULTI_5":        "Multi en 5",
+    "MULTI_6":        "Multi en 6",
+    "MULTI_7":        "Multi en 7",
     "TRIO":           "Trio",
 }
 
@@ -60,7 +66,10 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "QUARTE":         ["QUARTE", "quarte", "QUARTE_PLUS", "QUARTE+"],
     "QUINTE":         ["QUINTE", "quinte", "QUINTE_PLUS", "QUINTE+"],
     "DEUX_SUR_QUATRE": ["DEUX_SUR_QUATRE", "2sur4", "2SUR4"],
-    "MULTI":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
+    "MULTI_4":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
+    "MULTI_5":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
+    "MULTI_6":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
+    "MULTI_7":          ["MULTI", "multi", "PICK5", "E_COMBINED_5"],
     "TRIO":           ["TRIO", "trio"],
 }
 
@@ -178,13 +187,37 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
         real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
         return top2.issubset(real_top4)
 
-    elif pari_key == "MULTI":
+    elif pari_key == "MULTI_4":
         # top4 tous dans top4
         if len(sorted_participants) < 4:
             return False
         top4 = {sorted_participants[i].num_pmu for i in range(4)}
         real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
         return top4 == real_top4
+
+    elif pari_key == "MULTI_5":
+        # top5, au moins 4 dans top4
+        if len(sorted_participants) < 5:
+            return False
+        top5 = {sorted_participants[i].num_pmu for i in range(5)}
+        real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
+        return len(top5 & real_top4) >= 4
+
+    elif pari_key == "MULTI_6":
+        # top6, au moins 4 dans top4
+        if len(sorted_participants) < 6:
+            return False
+        top6 = {sorted_participants[i].num_pmu for i in range(6)}
+        real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
+        return len(top6 & real_top4) >= 4
+
+    elif pari_key == "MULTI_7":
+        # top7, au moins 4 dans top4
+        if len(sorted_participants) < 7:
+            return False
+        top7 = {sorted_participants[i].num_pmu for i in range(7)}
+        real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
+        return len(top7 & real_top4) >= 4
 
     elif pari_key == "TRIO":
         # top3 tous dans top3
