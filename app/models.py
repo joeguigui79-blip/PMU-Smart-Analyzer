@@ -15,7 +15,7 @@ class Reunion(Base):
     hippodrome_libelle: Mapped[str] = mapped_column(String(100))
     pays: Mapped[str] = mapped_column(String(50), default="FRANCE")
 
-    courses: Mapped[list["Course"]] = relationship("Course", back_populates="reunion", cascade="all, delete-orphan")
+    courses: Mapped[list["Course"]] = relationship("Course", back_populates="reunion", cascade="all, delete-orphan", order_by="Course.num_externe")
 
 
 class Course(Base):
