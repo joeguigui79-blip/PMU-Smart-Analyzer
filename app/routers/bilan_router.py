@@ -232,32 +232,31 @@ async def get_bilan(db: AsyncSession = Depends(get_db)):
     total_courses_with_results = 0
 
     for course in courses:
-        # Récupérer les participants avec position_arrivee renseignée
+        # Récupérer TOUS les participants de la course
         p_result = await db.execute(
-            select(Participant).where(
-                Participant.course_id == course.id,
-                Participant.position_arrivee.isnot(None),
-            )
+            select(Participant).where(Participant.course_id == course.id)
         )
-        participants = p_result.scalars().all()
+        all_participants = p_result.scalars().all()
 
-        if len(participants) < 2:
+        # Vérifier qu'il y a des arrivées renseignées
+        participants_with_pos = [p for p in all_participants if p.position_arrivee is not None]
+        if len(participants_with_pos) < 2:
             continue
 
         total_courses_with_results += 1
 
-        # Construire le dict positions
-        positions = {p.num_pmu: p.position_arrivee for p in participants}
+        # Construire le dict positions (seulement ceux avec position)
+        positions = {p.num_pmu: p.position_arrivee for p in participants_with_pos}
 
         # Pour chaque type de pari disponible dans la course
         for pari_key in PARIS_LABELS:
             if not _pari_in_disponibles(pari_key, course.paris_disponibles):
                 continue
 
-            # Pour chaque mode
+            # Pour chaque mode — trier TOUS les participants par score
             for mode in MODES:
                 sorted_parts = sorted(
-                    participants,
+                    all_participants,
                     key=lambda p: _score_for_mode(p, mode),
                     reverse=True,
                 )
