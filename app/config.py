@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -5,7 +6,14 @@ PMU_BASE_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 PMU_PARTICIPANTS_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date}/R{reunion}/C{course}/participants"
 PMU_ARRIVEE_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date}/R{reunion}/C{course}/arrivee"
 
-DATABASE_URL = "sqlite+aiosqlite:///./pmu_analyzer.db"
+# DATABASE_URL format attendu: postgresql+asyncpg://user:password@host:port/dbname
+# Supabase fournit une URL postgres:// ou postgresql:// — conversion automatique ci-dessous.
+# Sans DATABASE_URL dans l'environnement, fallback SQLite local.
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./pmu_analyzer.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
 
