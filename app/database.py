@@ -20,11 +20,11 @@ class Base(DeclarativeBase):
 
 
 async def init_db():
-    """Crée les tables si elles n'existent pas (CREATE TABLE IF NOT EXISTS via create_all).
-    Aucun drop/recreate : compatible PostgreSQL (Supabase) et SQLite local.
-    """
+    """Crée les tables. Drop et recrée si nécessaire (migration simplifiée)."""
     from app import models  # noqa: F401
     async with engine.begin() as conn:
+        # Drop all pour recréer avec les bons types (migration SQLite→PostgreSQL)
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     await seed_scoring_weights()
 

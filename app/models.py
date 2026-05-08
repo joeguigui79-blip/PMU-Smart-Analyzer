@@ -27,7 +27,7 @@ class Course(Base):
     num_externe: Mapped[int] = mapped_column(Integer)
     libelle: Mapped[str] = mapped_column(String(200))
     libelle_court: Mapped[str] = mapped_column(String(100), default="")
-    heure_depart: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    heure_depart: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     distance: Mapped[int] = mapped_column(Integer, default=0)
     discipline: Mapped[str] = mapped_column(String(50), default="PLAT")
     specialite: Mapped[str] = mapped_column(String(50), default="PLAT")
