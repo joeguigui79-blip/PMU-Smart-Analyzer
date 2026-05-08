@@ -1370,7 +1370,7 @@ function renderBilanPage(data) {
 
   var parisOrder = [
     "GAGNANT", "PLACE", "COUPLE_GAGNANT", "COUPLE_PLACE", "COUPLE_ORDRE",
-    "TIERCE", "QUARTE", "QUINTE", "DEUX_SUR_QUATRE", "MULTI", "TRIO"
+    "TIERCE", "QUARTE", "QUINTE", "DEUX_SUR_QUATRE", "MULTI_4", "MULTI_5", "MULTI_6", "MULTI_7", "TRIO"
   ];
 
   parisOrder.forEach(function (key) {
