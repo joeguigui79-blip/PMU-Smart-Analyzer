@@ -1,19 +1,15 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.config import DATABASE_URL, SCORING_WEIGHTS_DISCIPLINE
-from sqlalchemy.pool import NullPool
+import ssl
 
 
-# Pour Supabase (PgBouncer) : NullPool + statement_cache_size=0 dans l'URL
+# Configuration engine selon le type de DB
 _engine_kwargs = {"echo": False}
 if "postgresql" in DATABASE_URL or "asyncpg" in DATABASE_URL:
-    # NullPool évite les conflits avec PgBouncer
-    _engine_kwargs["poolclass"] = NullPool
-    # Passer statement_cache_size via connect_args pour asyncpg
-    _engine_kwargs["connect_args"] = {
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-    }
+    # SSL requis pour Neon/Supabase
+    ssl_context = ssl.create_default_context()
+    _engine_kwargs["connect_args"] = {"ssl": ssl_context}
 
 engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)

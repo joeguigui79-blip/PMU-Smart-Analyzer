@@ -7,12 +7,12 @@ PMU_PARTICIPANTS_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/progra
 PMU_ARRIVEE_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date}/R{reunion}/C{course}/arrivee"
 
 # DATABASE_URL format attendu: postgresql+asyncpg://user:password@host:port/dbname
-# Supabase fournit une URL postgres:// ou postgresql:// — conversion automatique ci-dessous.
+# Neon/Supabase fournissent une URL postgres:// ou postgresql:// — conversion automatique ci-dessous.
 # Sans DATABASE_URL dans l'environnement, fallback SQLite local.
 _raw_db_url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./pmu_analyzer.db")
 if _raw_db_url.startswith("postgres://"):
     DATABASE_URL = _raw_db_url.replace("postgres://", "postgresql+asyncpg://", 1)
-elif _raw_db_url.startswith("postgresql://"):
+elif _raw_db_url.startswith("postgresql://") and "+asyncpg" not in _raw_db_url:
     DATABASE_URL = _raw_db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 else:
     DATABASE_URL = _raw_db_url
