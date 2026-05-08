@@ -9,11 +9,13 @@ PMU_ARRIVEE_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{
 # DATABASE_URL format attendu: postgresql+asyncpg://user:password@host:port/dbname
 # Supabase fournit une URL postgres:// ou postgresql:// — conversion automatique ci-dessous.
 # Sans DATABASE_URL dans l'environnement, fallback SQLite local.
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./pmu_analyzer.db")
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
-elif DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+_raw_db_url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./pmu_analyzer.db")
+if _raw_db_url.startswith("postgres://"):
+    DATABASE_URL = _raw_db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+elif _raw_db_url.startswith("postgresql://"):
+    DATABASE_URL = _raw_db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+else:
+    DATABASE_URL = _raw_db_url
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
 
