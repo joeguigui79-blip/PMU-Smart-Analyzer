@@ -1228,3 +1228,99 @@ body {
   margin-left: 4px;
   font-weight: normal;
 }
+
+/* ---- Bilan page ---- */
+.bilan-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+}
+.bilan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 280px;
+}
+.bilan-table thead tr {
+  background: var(--bg3);
+}
+.bilan-th-pari {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  min-width: 110px;
+}
+.bilan-th-mode {
+  text-align: center;
+  padding: 8px 6px;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  width: 80px;
+}
+.bilan-row {
+  border-bottom: 1px solid var(--border);
+}
+.bilan-row:last-child { border-bottom: none; }
+.bilan-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+.bilan-td-pari {
+  padding: 9px 10px;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 13px;
+}
+.bilan-td-mode {
+  padding: 9px 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+.bilan-td-mode .bilan-ratio {
+  display: block;
+  font-weight: 700;
+  font-size: 13px;
+}
+.bilan-td-mode .bilan-pct {
+  display: block;
+  font-size: 11px;
+  margin-top: 1px;
+  opacity: 0.8;
+}
+.bilan-good { color: var(--green); }
+.bilan-mid  { color: var(--gold); }
+.bilan-bad  { color: var(--red); }
+.bilan-na   { color: var(--text-muted); }
+.bilan-na-text { color: var(--text-muted); font-size: 18px; }
+.bilan-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: var(--bg3);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.bilan-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.bilan-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.bilan-dot.bilan-good { background: var(--green); }
+.bilan-dot.bilan-mid  { background: var(--gold); }
+.bilan-dot.bilan-bad  { background: var(--red); }

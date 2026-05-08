@@ -12,6 +12,7 @@ from app.routers import bets as bets_router
 from app.routers import scoring as scoring_router
 from app.routers import auth_router
 from app.routers import stats_router
+from app.routers import bilan_router
 from app.auth import validate_token, get_token_from_request
 
 logging.basicConfig(
@@ -88,6 +89,7 @@ app.include_router(dashboard.router)
 app.include_router(bets_router.router)
 app.include_router(scoring_router.router)
 app.include_router(stats_router.router)
+app.include_router(bilan_router.router)
 
 # Servir les fichiers statiques
 app.mount("/static", StaticFiles(directory="static"), name="static")

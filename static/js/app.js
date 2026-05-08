@@ -49,6 +49,7 @@ function navigate(page, opts) {
   }
   else if (page === "bets") window.Bets && window.Bets.renderBetsPage();
   else if (page === "stats") loadStatsPage();
+  else if (page === "bilan") loadBilanPage();
 }
 
 // ---- Toast ----
@@ -1294,3 +1295,109 @@ async function doCalibrate() {
 }
 
 window.doCalibrate = doCalibrate;
+
+// =============================================================================
+// PAGE BILAN — Backtesting des modes de scoring
+// =============================================================================
+
+var _bilanData = null;
+
+async function loadBilanPage() {
+  var container = document.getElementById("bilan-content");
+  if (!container) return;
+  container.innerHTML = '<div class="stats-loading"><div class="spinner"></div><p>Calcul du bilan en cours\u2026</p></div>';
+
+  try {
+    _bilanData = await API.bilan();
+    container.innerHTML = renderBilanPage(_bilanData);
+  } catch (e) {
+    container.innerHTML = '<div class="stats-error">Erreur lors du chargement du bilan.<br>' + (e.message || "") + "</div>";
+  }
+}
+
+function renderBilanPage(data) {
+  var totalCourses = (data && data.total_courses) || 0;
+  var paris = (data && data.paris) || {};
+
+  var html = '<div class="stats-page">';
+
+  // Header
+  html += '<div class="stats-header">';
+  html += '<h2 class="stats-title">Bilan &mdash; Backtesting</h2>';
+  html += '<p class="stats-subtitle">Simulation des paris sur les courses termin\u00e9es</p>';
+  html += '</div>';
+
+  // Résumé
+  html += '<div class="stats-summary-row">';
+  html += '<div class="stats-summary-card"><div class="ssc-value">' + totalCourses + '</div><div class="ssc-label">Courses \u00e9valu\u00e9es</div></div>';
+  html += '</div>';
+
+  if (totalCourses === 0) {
+    html += '<div class="stats-section"><p class="stats-empty">Aucune course termin\u00e9e avec arriv\u00e9es connues pour l\u2019instant.</p></div>';
+    html += '</div>';
+    return html;
+  }
+
+  // Tableau des paris
+  html += '<div class="stats-section">';
+  html += '<h3 class="stats-section-title">Taux de r\u00e9ussite par type de pari</h3>';
+  html += '<div class="bilan-table-wrap">';
+  html += '<table class="bilan-table">';
+  html += '<thead><tr>';
+  html += '<th class="bilan-th-pari">Type de pari</th>';
+  html += '<th class="bilan-th-mode">Auto</th>';
+  html += '<th class="bilan-th-mode">Expert</th>';
+  html += '<th class="bilan-th-mode">Sans cote</th>';
+  html += '</tr></thead>';
+  html += '<tbody>';
+
+  var parisOrder = [
+    "GAGNANT", "PLACE", "COUPLE_GAGNANT", "COUPLE_PLACE", "COUPLE_ORDRE",
+    "TIERCE", "QUARTE", "QUINTE", "DEUX_SUR_QUATRE", "MULTI", "TRIO"
+  ];
+
+  parisOrder.forEach(function (key) {
+    var pari = paris[key];
+    if (!pari) return;
+
+    // Vérifier si au moins un mode a des données
+    var anyData = ["auto", "expert", "sans_cote"].some(function (m) {
+      return pari[m] && pari[m].evaluees > 0;
+    });
+
+    html += '<tr class="bilan-row">';
+    html += '<td class="bilan-td-pari">' + (pari.label || key) + '</td>';
+
+    ["auto", "expert", "sans_cote"].forEach(function (mode) {
+      var cell = pari[mode];
+      if (!cell || cell.evaluees === 0) {
+        html += '<td class="bilan-td-mode bilan-na"><span class="bilan-na-text">—</span></td>';
+      } else {
+        var taux = cell.taux;
+        var cls = taux === null ? "" : taux >= 40 ? "bilan-good" : taux >= 20 ? "bilan-mid" : "bilan-bad";
+        var tauxStr = taux !== null ? taux + "%" : "0%";
+        html += '<td class="bilan-td-mode ' + cls + '">';
+        html += '<span class="bilan-ratio">' + cell.gagnes + '/' + cell.evaluees + '</span>';
+        html += '<span class="bilan-pct">' + tauxStr + '</span>';
+        html += '</td>';
+      }
+    });
+
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  html += '</div>'; // bilan-table-wrap
+
+  // Légende
+  html += '<div class="bilan-legend">';
+  html += '<span class="bilan-legend-item"><span class="bilan-dot bilan-good"></span>&ge;40%</span>';
+  html += '<span class="bilan-legend-item"><span class="bilan-dot bilan-mid"></span>20&ndash;39%</span>';
+  html += '<span class="bilan-legend-item"><span class="bilan-dot bilan-bad"></span>&lt;20%</span>';
+  html += '<span class="bilan-legend-item"><span class="bilan-na-text">&mdash;</span> Pari non disponible</span>';
+  html += '</div>';
+
+  html += '</div>'; // stats-section
+  html += '</div>'; // stats-page
+  return html;
+}

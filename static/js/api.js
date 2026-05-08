@@ -66,6 +66,9 @@ const API = {
   statsScoring:     function () { return apiFetch("/api/stats/scoring"); },
   statsCalibration: function () { return apiFetch("/api/stats/calibration"); },
   calibrate:        function () { return apiFetch("/api/calibrate", { method: "POST" }); },
+
+  // ---- Bilan backtesting ----
+  bilan: function () { return apiFetch("/api/bilan"); },
 };
 
 window.API = API;
