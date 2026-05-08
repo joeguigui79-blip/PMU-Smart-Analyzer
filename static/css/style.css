@@ -1192,11 +1192,12 @@ body {
   text-align: right;
 }
 
-/* ---- Toggle Scoring Mode (Avec cote / Sans cote) ---- */
+/* ---- Toggle Scoring Mode (Auto / Expert / Sans cote) ---- */
 .scoring-toggle {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 .scoring-toggle-btn {
   padding: 4px 10px;
@@ -1218,4 +1219,12 @@ body {
 .scoring-toggle-btn:not(.active):hover {
   border-color: var(--text-dim);
   color: var(--text-dim);
+}
+
+/* ---- Fallback badge (mode Auto = Expert) ---- */
+.fallback-badge {
+  font-size: 0.7em;
+  color: #999;
+  margin-left: 4px;
+  font-weight: normal;
 }

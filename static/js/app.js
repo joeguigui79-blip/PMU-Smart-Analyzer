@@ -6,7 +6,7 @@ let currentPage = "dashboard";
 var _coursesScrollPos = 0;
 var _coursesLoaded = false;
 let _betModalCourse = null;   // course courante pour le modal de pari
-var _scoringMode = "avec_cote"; // "avec_cote" | "sans_cote"
+var _scoringMode = "auto"; // "auto" | "expert" | "sans_cote"
 
 const H = () => window.Components;
 
@@ -453,21 +453,46 @@ function renderCourseDetail(course, suggestions) {
 
   if (course.participants && course.participants.length > 0) {
     var sectionTitle = _scoringMode === "sans_cote"
-      ? "Partants (triés sans cote)"
-      : "Partants (triés par score)";
-    html += "<div style='display:flex;align-items:center;justify-content:space-between;padding:16px 16px 4px'>" +
-      "<span class='section-title' style='padding:0;margin:0'>" + sectionTitle + "</span>" +
+      ? "Partants (score sans cote)"
+      : _scoringMode === "expert"
+      ? "Partants (score Expert)"
+      : "Partants (score Auto)";
+
+    // Tri selon le mode
+    var sorted = course.participants.slice().sort(function(a, b) {
+      var sa, sb;
+      if (_scoringMode === "sans_cote") {
+        sa = a.score_sans_cote || 0;
+        sb = b.score_sans_cote || 0;
+      } else if (_scoringMode === "expert") {
+        sa = a.score_global_expert || 0;
+        sb = b.score_global_expert || 0;
+      } else {
+        sa = a.score_global_auto || 0;
+        sb = b.score_global_auto || 0;
+      }
+      return sb - sa;
+    });
+
+    // Badge fallback: mode auto + 1er cheval a score_global_auto == score_global_expert ou == 0
+    var fallbackBadge = "";
+    if (_scoringMode === "auto" && sorted.length > 0) {
+      var first = sorted[0];
+      var autoScore = first.score_global_auto || 0;
+      var expertScore = first.score_global_expert || 0;
+      if (autoScore === 0 || autoScore === expertScore) {
+        fallbackBadge = "<span class='fallback-badge'>(= Expert)</span>";
+      }
+    }
+
+    html += "<div style='display:flex;align-items:center;justify-content:space-between;padding:16px 16px 4px;flex-wrap:wrap;gap:6px'>" +
+      "<span class='section-title' style='padding:0;margin:0'>" + sectionTitle + fallbackBadge + "</span>" +
       "<div class='scoring-toggle'>" +
-      "<button class='scoring-toggle-btn" + (_scoringMode === "avec_cote" ? " active" : "") + "' onclick='setScoringMode(\"avec_cote\")'>Avec cote</button>" +
+      "<button class='scoring-toggle-btn" + (_scoringMode === "auto" ? " active" : "") + "' onclick='setScoringMode(\"auto\")'>Auto</button>" +
+      "<button class='scoring-toggle-btn" + (_scoringMode === "expert" ? " active" : "") + "' onclick='setScoringMode(\"expert\")'>Expert</button>" +
       "<button class='scoring-toggle-btn" + (_scoringMode === "sans_cote" ? " active" : "") + "' onclick='setScoringMode(\"sans_cote\")'>Sans cote</button>" +
       "</div>" +
       "</div>";
-
-    var sorted = course.participants.slice().sort(function(a, b) {
-      var sa = _scoringMode === "sans_cote" ? (a.score_sans_cote || 0) : (a.score_global || 0);
-      var sb = _scoringMode === "sans_cote" ? (b.score_sans_cote || 0) : (b.score_global || 0);
-      return sb - sa;
-    });
 
     html += "<div class='card' style='padding:0 16px' id='participants-list'>";
     sorted.forEach(function (p, i) {
@@ -598,9 +623,15 @@ function renderParticipantRowWithBet(p, rank, course, hippodrome) {
   const safeP = JSON.stringify(p).replace(/"/g, "&quot;");
 
   // Score affiché selon le mode actif
-  var displayScore = _scoringMode === "sans_cote"
-    ? (p.score_sans_cote != null ? p.score_sans_cote : p.score_global)
-    : p.score_global;
+  var displayScore;
+  if (_scoringMode === "sans_cote") {
+    displayScore = p.score_sans_cote != null ? p.score_sans_cote : (p.score_global || 0);
+  } else if (_scoringMode === "expert") {
+    displayScore = p.score_global_expert != null ? p.score_global_expert : (p.score_global || 0);
+  } else {
+    // auto: score_global_auto, fallback expert, fallback global
+    displayScore = p.score_global_auto != null ? p.score_global_auto : (p.score_global_expert != null ? p.score_global_expert : (p.score_global || 0));
+  }
 
   // Position d'arrivée si disponible
   const posHtml = p.position_arrivee
