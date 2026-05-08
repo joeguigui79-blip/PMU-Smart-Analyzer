@@ -84,7 +84,7 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "DEUX_SUR_QUATRE":  ["DEUX_SUR_QUATRE", "E_DEUX_SUR_QUATRE", "2sur4", "2SUR4"],
     "MULTI_4":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
     "MULTI_5":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
-    "MULTI_6":          ["MULTI", "E_MULTI"],
+    "MULTI_6":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
     "MULTI_7":          ["MULTI", "E_MULTI"],
     "TRIO":             ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
 }
