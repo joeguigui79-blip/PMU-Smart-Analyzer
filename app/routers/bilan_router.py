@@ -43,38 +43,50 @@ router = APIRouter(tags=["bilan"])
 # Mapping type de pari → clé API normalisée
 # La clé correspond aux valeurs potentielles dans paris_disponibles
 PARIS_LABELS = {
-    "GAGNANT":        "Gagnant",
-    "PLACE":          "Place",
-    "COUPLE_GAGNANT": "Couple Gagnant",
-    "COUPLE_PLACE":   "Couple Place",
-    "COUPLE_ORDRE":   "Couple Ordre",
-    "TIERCE":         "Tiercé",
-    "QUARTE":         "Quarté+",
-    "QUINTE":         "Quinté+",
-    "DEUX_SUR_QUATRE": "2sur4",
-    "MULTI_4":        "Multi en 4",
-    "MULTI_5":        "Multi en 5",
-    "MULTI_6":        "Multi en 6",
-    "MULTI_7":        "Multi en 7",
-    "TRIO":           "Trio",
+    "GAGNANT":          "Gagnant",
+    "PLACE":            "Place",
+    "COUPLE_GAGNANT":   "Couple Gagnant",
+    "COUPLE_PLACE":     "Couple Place",
+    "COUPLE_ORDRE":     "Couple Ordre",
+    "TIERCE_ORDRE":     "Tierc\u00e9 Ordre",
+    "TIERCE_DESORDRE":  "Tierc\u00e9 D\u00e9sordre",
+    "QUARTE_ORDRE":     "Quart\u00e9+ Ordre",
+    "QUARTE_DESORDRE":  "Quart\u00e9+ D\u00e9sordre",
+    "QUARTE_BONUS3":    "Quart\u00e9+ Bonus 3",
+    "QUINTE_ORDRE":     "Quint\u00e9+ Ordre",
+    "QUINTE_DESORDRE":  "Quint\u00e9+ D\u00e9sordre",
+    "QUINTE_BONUS4":    "Quint\u00e9+ Bonus 4/5",
+    "QUINTE_BONUS3":    "Quint\u00e9+ Bonus 3",
+    "DEUX_SUR_QUATRE":  "2sur4",
+    "MULTI_4":          "Multi en 4",
+    "MULTI_5":          "Multi en 5",
+    "MULTI_6":          "Multi en 6",
+    "MULTI_7":          "Multi en 7",
+    "TRIO":             "Trio",
 }
 
 # Alias supplémentaires pour la correspondance avec paris_disponibles
 PARIS_ALIASES: dict[str, list[str]] = {
-    "GAGNANT":        ["SIMPLE_GAGNANT", "E_SIMPLE_GAGNANT", "GAGNANT", "gagnant"],
-    "PLACE":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
-    "COUPLE_GAGNANT": ["COUPLE_GAGNANT", "E_COUPLE_GAGNANT", "couple_gagnant", "COUPLE", "couple"],
-    "COUPLE_PLACE":   ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
-    "COUPLE_ORDRE":   ["COUPLE_ORDRE", "E_COUPLE_ORDRE", "couple_ordre"],
-    "TIERCE":         ["TIERCE", "E_TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
-    "QUARTE":         ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "quarte", "QUARTE+"],
-    "QUINTE":         ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "quinte", "QUINTE+"],
-    "DEUX_SUR_QUATRE": ["DEUX_SUR_QUATRE", "E_DEUX_SUR_QUATRE", "2sur4", "2SUR4"],
-    "MULTI_4":        ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
-    "MULTI_5":        ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
-    "MULTI_6":        ["MULTI", "E_MULTI"],
-    "MULTI_7":        ["MULTI", "E_MULTI"],
-    "TRIO":           ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
+    "GAGNANT":          ["SIMPLE_GAGNANT", "E_SIMPLE_GAGNANT", "GAGNANT", "gagnant"],
+    "PLACE":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "COUPLE_GAGNANT":   ["COUPLE_GAGNANT", "E_COUPLE_GAGNANT", "couple_gagnant", "COUPLE", "couple"],
+    "COUPLE_PLACE":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    "COUPLE_ORDRE":     ["COUPLE_ORDRE", "E_COUPLE_ORDRE", "couple_ordre"],
+    "TIERCE_ORDRE":     ["TIERCE", "E_TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
+    "TIERCE_DESORDRE":  ["TIERCE", "E_TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
+    "QUARTE_ORDRE":     ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "quarte", "QUARTE+"],
+    "QUARTE_DESORDRE":  ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "quarte", "QUARTE+"],
+    "QUARTE_BONUS3":    ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "quarte", "QUARTE+"],
+    "QUINTE_ORDRE":     ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "quinte", "QUINTE+"],
+    "QUINTE_DESORDRE":  ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "quinte", "QUINTE+"],
+    "QUINTE_BONUS4":    ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "quinte", "QUINTE+"],
+    "QUINTE_BONUS3":    ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "quinte", "QUINTE+"],
+    "DEUX_SUR_QUATRE":  ["DEUX_SUR_QUATRE", "E_DEUX_SUR_QUATRE", "2sur4", "2SUR4"],
+    "MULTI_4":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
+    "MULTI_5":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
+    "MULTI_6":          ["MULTI", "E_MULTI"],
+    "MULTI_7":          ["MULTI", "E_MULTI"],
+    "TRIO":             ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
 }
 
 MODES = ["auto", "expert", "sans_cote"]
@@ -159,29 +171,110 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
         top2 = sorted_participants[1].num_pmu
         return positions.get(top1) == 1 and positions.get(top2) == 2
 
-    elif pari_key == "TIERCE":
-        # top3 tous dans top3
+    elif pari_key == "TIERCE_ORDRE":
+        # top3 dans l'ordre exact
+        if len(sorted_participants) < 3:
+            return False
+        return (positions.get(sorted_participants[0].num_pmu) == 1
+                and positions.get(sorted_participants[1].num_pmu) == 2
+                and positions.get(sorted_participants[2].num_pmu) == 3)
+
+    elif pari_key == "TIERCE_DESORDRE":
+        # top3 tous dans top3 mais PAS dans l'ordre exact
         if len(sorted_participants) < 3:
             return False
         top3 = {sorted_participants[i].num_pmu for i in range(3)}
         real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
-        return top3 == real_top3
+        if not top3 == real_top3:
+            return False
+        # Vérifier que ce n'est PAS dans l'ordre
+        in_order = (positions.get(sorted_participants[0].num_pmu) == 1
+                    and positions.get(sorted_participants[1].num_pmu) == 2
+                    and positions.get(sorted_participants[2].num_pmu) == 3)
+        return not in_order
 
-    elif pari_key == "QUARTE":
-        # top4 tous dans top4
+    elif pari_key == "QUARTE_ORDRE":
+        # top4 dans l'ordre exact
+        if len(sorted_participants) < 4:
+            return False
+        return (positions.get(sorted_participants[0].num_pmu) == 1
+                and positions.get(sorted_participants[1].num_pmu) == 2
+                and positions.get(sorted_participants[2].num_pmu) == 3
+                and positions.get(sorted_participants[3].num_pmu) == 4)
+
+    elif pari_key == "QUARTE_DESORDRE":
+        # top4 tous dans top4 mais PAS dans l'ordre exact
         if len(sorted_participants) < 4:
             return False
         top4 = {sorted_participants[i].num_pmu for i in range(4)}
         real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
-        return top4 == real_top4
+        if not top4 == real_top4:
+            return False
+        in_order = (positions.get(sorted_participants[0].num_pmu) == 1
+                    and positions.get(sorted_participants[1].num_pmu) == 2
+                    and positions.get(sorted_participants[2].num_pmu) == 3
+                    and positions.get(sorted_participants[3].num_pmu) == 4)
+        return not in_order
 
-    elif pari_key == "QUINTE":
-        # top5 tous dans top5
+    elif pari_key == "QUARTE_BONUS3":
+        # les 3 premiers de la sélection (top3 sur 4) sont dans le vrai top3, pas dans l'ordre exact
+        if len(sorted_participants) < 4:
+            return False
+        top3_of_selection = {sorted_participants[i].num_pmu for i in range(3)}
+        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
+        if not top3_of_selection == real_top3:
+            return False
+        # Pas dans l'ordre exact
+        in_order = (positions.get(sorted_participants[0].num_pmu) == 1
+                    and positions.get(sorted_participants[1].num_pmu) == 2
+                    and positions.get(sorted_participants[2].num_pmu) == 3)
+        return not in_order
+
+    elif pari_key == "QUINTE_ORDRE":
+        # top5 dans l'ordre exact
+        if len(sorted_participants) < 5:
+            return False
+        return (positions.get(sorted_participants[0].num_pmu) == 1
+                and positions.get(sorted_participants[1].num_pmu) == 2
+                and positions.get(sorted_participants[2].num_pmu) == 3
+                and positions.get(sorted_participants[3].num_pmu) == 4
+                and positions.get(sorted_participants[4].num_pmu) == 5)
+
+    elif pari_key == "QUINTE_DESORDRE":
+        # top5 tous dans top5 mais PAS dans l'ordre exact
         if len(sorted_participants) < 5:
             return False
         top5 = {sorted_participants[i].num_pmu for i in range(5)}
         real_top5 = {num for num, pos in positions.items() if pos is not None and pos <= 5}
-        return top5 == real_top5
+        if not top5 == real_top5:
+            return False
+        in_order = (positions.get(sorted_participants[0].num_pmu) == 1
+                    and positions.get(sorted_participants[1].num_pmu) == 2
+                    and positions.get(sorted_participants[2].num_pmu) == 3
+                    and positions.get(sorted_participants[3].num_pmu) == 4
+                    and positions.get(sorted_participants[4].num_pmu) == 5)
+        return not in_order
+
+    elif pari_key == "QUINTE_BONUS4":
+        # exactement 4 des 5 joués sont dans le vrai top5
+        if len(sorted_participants) < 5:
+            return False
+        top5 = {sorted_participants[i].num_pmu for i in range(5)}
+        real_top5 = {num for num, pos in positions.items() if pos is not None and pos <= 5}
+        return len(top5 & real_top5) == 4
+
+    elif pari_key == "QUINTE_BONUS3":
+        # les 3 premiers de la sélection (top3 sur 5) sont dans le vrai top3, pas dans l'ordre exact
+        if len(sorted_participants) < 5:
+            return False
+        top3_of_selection = {sorted_participants[i].num_pmu for i in range(3)}
+        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
+        if not top3_of_selection == real_top3:
+            return False
+        in_order = (positions.get(sorted_participants[0].num_pmu) == 1
+                    and positions.get(sorted_participants[1].num_pmu) == 2
+                    and positions.get(sorted_participants[2].num_pmu) == 3)
+        return not in_order
 
     elif pari_key == "DEUX_SUR_QUATRE":
         # top2 tous dans top4
