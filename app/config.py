@@ -10,6 +10,9 @@ PMU_ARRIVEE_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{
 # Neon/Supabase fournissent une URL postgres:// ou postgresql:// — conversion automatique ci-dessous.
 # Sans DATABASE_URL dans l'environnement, fallback SQLite local.
 _raw_db_url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./pmu_analyzer.db")
+# Retirer ?sslmode=require (asyncpg gère le SSL via connect_args, pas via URL)
+if "?" in _raw_db_url:
+    _raw_db_url = _raw_db_url.split("?")[0]
 if _raw_db_url.startswith("postgres://"):
     DATABASE_URL = _raw_db_url.replace("postgres://", "postgresql+asyncpg://", 1)
 elif _raw_db_url.startswith("postgresql://") and "+asyncpg" not in _raw_db_url:
