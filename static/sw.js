@@ -5,8 +5,8 @@
    - Appels API        → Network-first avec fallback cache
    ============================================= */
 
-const CACHE_STATIC  = "pmu-static-v3";
-const CACHE_API     = "pmu-api-v1";
+const CACHE_STATIC  = "pmu-static-v4";
+const CACHE_API     = "pmu-api-v2";
 
 const STATIC_ASSETS = [
   "/",
