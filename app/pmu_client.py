@@ -277,6 +277,32 @@ class PMUClient:
             return result
         return None
 
+    async def get_pronostics(self, date_str: str, reunion_num: int, course_num: int) -> dict | None:
+        """
+        Récupère les pronostics (Equidia) d'une course.
+        Retourne {"source": str, "selection": [{"rang": int, "num_partant": int}, ...]} ou None.
+        """
+        url = f"{PMU_BASE_URL}/programme/{date_str}/R{reunion_num}/C{course_num}/pronostics"
+        try:
+            resp = await self._client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            logger.debug("PMU pronostics indisponible pour R%s/C%s: %s", reunion_num, course_num, e)
+            return None
+
+        selection = data.get("selection", [])
+        if not selection:
+            return None
+
+        return {
+            "source": data.get("source", "PMU"),
+            "selection": [
+                {"rang": s.get("rang", i + 1), "num_partant": s.get("num_partant")}
+                for i, s in enumerate(selection)
+            ],
+        }
+
 
 # Instance globale réutilisable
 pmu_client = PMUClient()

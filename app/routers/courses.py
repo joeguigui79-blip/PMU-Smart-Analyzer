@@ -222,3 +222,26 @@ async def get_live_scores(course_id: int, db: AsyncSession = Depends(get_db)):
         })
 
     return {"course_id": course_id, "participants": results}
+
+
+@router.get("/courses/{course_id}/pronostics")
+async def get_pronostics(course_id: int, db: AsyncSession = Depends(get_db)):
+    """Récupère les pronostics Equidia pour une course."""
+    result = await db.execute(
+        select(Course)
+        .where(Course.id == course_id)
+        .options(selectinload(Course.reunion))
+    )
+    course = result.scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course introuvable")
+
+    reunion = course.reunion
+    prono = await pmu_client.get_pronostics(
+        reunion.date_str, reunion.num_officiel, course.num_externe
+    )
+
+    if not prono:
+        return {"source": None, "selection": []}
+
+    return prono

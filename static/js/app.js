@@ -426,6 +426,9 @@ function renderCourseDetail(course, suggestions) {
 
   html += "</div>";
 
+  // Pronostics Equidia — zone placeholder (chargé en async)
+  html += "<div id='prono-equidia'></div>";
+
   // F3 : Suggestions IA — désactivé (affichage masqué)
   // if (suggestions && (suggestions.couple || suggestions.tierce || suggestions.deux_sur_quatre)) {
   //   html += renderSuggestions(suggestions, course);
@@ -513,6 +516,29 @@ function renderCourseDetail(course, suggestions) {
   }
 
   content.innerHTML = html;
+
+  // Charger les pronostics Equidia en async
+  _loadPronostics(course.id);
+}
+
+async function _loadPronostics(courseId) {
+  var container = document.getElementById("prono-equidia");
+  if (!container) return;
+  try {
+    var data = await API.pronostics(courseId);
+    if (!data || !data.selection || data.selection.length === 0) {
+      container.innerHTML = "";
+      return;
+    }
+    var nums = data.selection.map(function(s) { return s.num_partant; });
+    var source = data.source || "PMU";
+    container.innerHTML = "<div class='reco-banner' style='border-left:4px solid var(--gold);background:var(--surface)'>" +
+      "<div class='reco-title' style='color:var(--gold)'>\uD83D\uDCF0 Prono " + source + "</div>" +
+      "<div style='font-size:15px;font-weight:600;letter-spacing:1px'>" + nums.join(" - ") + "</div>" +
+      "</div>";
+  } catch (e) {
+    container.innerHTML = "";
+  }
 }
 
 // ---- F3 : Suggestions IA ----
