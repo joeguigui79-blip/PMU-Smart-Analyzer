@@ -47,9 +47,11 @@ PARIS_LABELS = {
     "PLACE_1":          "Plac\u00e9 1",
     "PLACE_2":          "Plac\u00e9 2",
     "PLACE_3":          "Plac\u00e9 3",
-    "COUPLE_GAGNANT":   "Couple Gagnant",
-    "COUPLE_PLACE":     "Couple Place",
-    "COUPLE_ORDRE":     "Couple Ordre",
+    "COUPLE_GAGNANT":   "Coupl\u00e9 Gagnant",
+    "COUPLE_PLACE_12":  "C. Plac\u00e9 1-2",
+    "COUPLE_PLACE_23":  "C. Plac\u00e9 2-3",
+    "COUPLE_PLACE_13":  "C. Plac\u00e9 1-3",
+    "COUPLE_ORDRE":     "Coupl\u00e9 Ordre",
     "TIERCE_ORDRE":     "Tierc\u00e9 Ordre",
     "TIERCE_DESORDRE":  "Tierc\u00e9 D\u00e9sordre",
     "QUARTE_ORDRE":     "Quart\u00e9+ Ordre",
@@ -74,7 +76,9 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "PLACE_2":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "PLACE_3":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "COUPLE_GAGNANT":   ["COUPLE_GAGNANT", "E_COUPLE_GAGNANT", "couple_gagnant", "COUPLE", "couple"],
-    "COUPLE_PLACE":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    "COUPLE_PLACE_12":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    "COUPLE_PLACE_23":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    "COUPLE_PLACE_13":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     "COUPLE_ORDRE":     ["COUPLE_ORDRE", "E_COUPLE_ORDRE", "couple_ordre"],
     "TIERCE_ORDRE":     ["TIERCE", "E_TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
     "TIERCE_DESORDRE":  ["TIERCE", "E_TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
@@ -172,13 +176,26 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
         real_top2 = {num for num, pos in positions.items() if pos is not None and pos <= 2}
         return top2 == real_top2
 
-    elif pari_key == "COUPLE_PLACE":
-        # top2 tous dans top3
+    elif pari_key == "COUPLE_PLACE_12":
+        # top1 et top2 tous dans top3
         if len(sorted_participants) < 2:
             return False
-        top2 = {sorted_participants[0].num_pmu, sorted_participants[1].num_pmu}
         real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
-        return top2.issubset(real_top3)
+        return {sorted_participants[0].num_pmu, sorted_participants[1].num_pmu}.issubset(real_top3)
+
+    elif pari_key == "COUPLE_PLACE_23":
+        # top2 et top3 tous dans top3
+        if len(sorted_participants) < 3:
+            return False
+        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
+        return {sorted_participants[1].num_pmu, sorted_participants[2].num_pmu}.issubset(real_top3)
+
+    elif pari_key == "COUPLE_PLACE_13":
+        # top1 et top3 tous dans top3
+        if len(sorted_participants) < 3:
+            return False
+        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
+        return {sorted_participants[0].num_pmu, sorted_participants[2].num_pmu}.issubset(real_top3)
 
     elif pari_key == "COUPLE_ORDRE":
         # top1 est 1er ET top2 est 2ème
