@@ -185,11 +185,61 @@ async def refresh_programme_statuts(db: AsyncSession) -> int:
     return updated
 
 
+async def _refresh_cotes_if_needed(db: AsyncSession, course: Course, reunion: Reunion) -> None:
+    """
+    Si des participants ont cote_actuelle=null, re-fetch les cotes depuis l'API PMU
+    et met à jour en base. Ne recalcule pas les scores.
+    """
+    # Vérifier s'il y a des cotes manquantes
+    result = await db.execute(
+        select(Participant).where(
+            Participant.course_id == course.id,
+            Participant.cote_actuelle.is_(None),
+        )
+    )
+    participants_without_cote = result.scalars().all()
+    if not participants_without_cote:
+        return
+
+    # Appeler l'API PMU pour récupérer les cotes
+    try:
+        participants_data = await pmu_client.get_participants(
+            reunion.date_str, reunion.num_officiel, course.num_externe
+        )
+    except Exception:
+        return
+
+    if not participants_data:
+        return
+
+    # Construire un dict num_pmu -> cotes
+    cotes_map = {}
+    for p_data in participants_data:
+        num = p_data.get("num_pmu")
+        cote = p_data.get("cote_actuelle")
+        if num and cote:
+            cotes_map[num] = cote
+
+    if not cotes_map:
+        return
+
+    # Mettre à jour les participants en base
+    for p in participants_without_cote:
+        if p.num_pmu in cotes_map:
+            p.cote_actuelle = cotes_map[p.num_pmu]
+
+    await db.commit()
+    logger.info("Cotes mises à jour pour course %s: %d participants", course.libelle, len(cotes_map))
+
+
 async def load_participants_for_course(db: AsyncSession, course: Course, reunion: Reunion) -> bool:
     """
     Charge les participants d'une course si pas déjà fait.
+    Si déjà chargés mais cotes manquantes, met à jour les cotes depuis l'API.
     """
     if course.participants_loaded:
+        # Vérifier si les cotes sont manquantes — les mettre à jour si oui
+        await _refresh_cotes_if_needed(db, course, reunion)
         return False
 
     # Double-check: participants may already exist in DB (race condition guard)
@@ -200,6 +250,7 @@ async def load_participants_for_course(db: AsyncSession, course: Course, reunion
         # Participants already loaded by a concurrent request — just mark flag
         course.participants_loaded = True
         await db.commit()
+        await _refresh_cotes_if_needed(db, course, reunion)
         return False
 
     date_str = reunion.date_str
