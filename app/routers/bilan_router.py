@@ -44,7 +44,9 @@ router = APIRouter(tags=["bilan"])
 # La clé correspond aux valeurs potentielles dans paris_disponibles
 PARIS_LABELS = {
     "GAGNANT":          "Gagnant",
-    "PLACE":            "Place",
+    "PLACE_1":          "Plac\u00e9 1",
+    "PLACE_2":          "Plac\u00e9 2",
+    "PLACE_3":          "Plac\u00e9 3",
     "COUPLE_GAGNANT":   "Couple Gagnant",
     "COUPLE_PLACE":     "Couple Place",
     "COUPLE_ORDRE":     "Couple Ordre",
@@ -68,7 +70,9 @@ PARIS_LABELS = {
 # Alias supplémentaires pour la correspondance avec paris_disponibles
 PARIS_ALIASES: dict[str, list[str]] = {
     "GAGNANT":          ["SIMPLE_GAGNANT", "E_SIMPLE_GAGNANT", "GAGNANT", "gagnant"],
-    "PLACE":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "PLACE_1":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "PLACE_2":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "PLACE_3":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "COUPLE_GAGNANT":   ["COUPLE_GAGNANT", "E_COUPLE_GAGNANT", "couple_gagnant", "COUPLE", "couple"],
     "COUPLE_PLACE":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     "COUPLE_ORDRE":     ["COUPLE_ORDRE", "E_COUPLE_ORDRE", "couple_ordre"],
@@ -139,12 +143,25 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
         top1 = sorted_participants[0].num_pmu
         return positions.get(top1) == 1
 
-    elif pari_key == "PLACE":
+    elif pari_key == "PLACE_1":
         # top1 finit dans top3
         if len(sorted_participants) < 1:
             return False
-        top1 = sorted_participants[0].num_pmu
-        pos = positions.get(top1)
+        pos = positions.get(sorted_participants[0].num_pmu)
+        return pos is not None and pos <= 3
+
+    elif pari_key == "PLACE_2":
+        # top2 finit dans top3
+        if len(sorted_participants) < 2:
+            return False
+        pos = positions.get(sorted_participants[1].num_pmu)
+        return pos is not None and pos <= 3
+
+    elif pari_key == "PLACE_3":
+        # top3 finit dans top3
+        if len(sorted_participants) < 3:
+            return False
+        pos = positions.get(sorted_participants[2].num_pmu)
         return pos is not None and pos <= 3
 
     elif pari_key == "COUPLE_GAGNANT":
