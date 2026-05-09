@@ -457,6 +457,8 @@ function renderCourseDetail(course, suggestions) {
       ? "Partants (score sans cote)"
       : _scoringMode === "expert"
       ? "Partants (score Expert)"
+      : _scoringMode === "cote_reelle"
+      ? "Partants (cote r\u00e9elle)"
       : "Partants (score Auto)";
 
     // Tri selon le mode
@@ -468,6 +470,11 @@ function renderCourseDetail(course, suggestions) {
       } else if (_scoringMode === "expert") {
         sa = a.score_global_expert || 0;
         sb = b.score_global_expert || 0;
+      } else if (_scoringMode === "cote_reelle" && course._liveScores) {
+        var la = course._liveScores[a.num_pmu];
+        var lb = course._liveScores[b.num_pmu];
+        sa = la ? la.score_live : (a.score_global_auto || 0);
+        sb = lb ? lb.score_live : (b.score_global_auto || 0);
       } else {
         sa = a.score_global_auto || 0;
         sb = b.score_global_auto || 0;
@@ -492,6 +499,7 @@ function renderCourseDetail(course, suggestions) {
       "<button class='scoring-toggle-btn" + (_scoringMode === "auto" ? " active" : "") + "' onclick='setScoringMode(\"auto\")'>Auto</button>" +
       "<button class='scoring-toggle-btn" + (_scoringMode === "expert" ? " active" : "") + "' onclick='setScoringMode(\"expert\")'>Expert</button>" +
       "<button class='scoring-toggle-btn" + (_scoringMode === "sans_cote" ? " active" : "") + "' onclick='setScoringMode(\"sans_cote\")'>Sans cote</button>" +
+      "<button class='scoring-toggle-btn" + (_scoringMode === "cote_reelle" ? " active" : "") + "' onclick='setScoringMode(\"cote_reelle\")'>Cote r\u00e9elle</button>" +
       "</div>" +
       "</div>";
 
@@ -629,6 +637,9 @@ function renderParticipantRowWithBet(p, rank, course, hippodrome) {
     displayScore = p.score_sans_cote != null ? p.score_sans_cote : (p.score_global || 0);
   } else if (_scoringMode === "expert") {
     displayScore = p.score_global_expert != null ? p.score_global_expert : (p.score_global || 0);
+  } else if (_scoringMode === "cote_reelle" && _betModalCourse && _betModalCourse._liveScores) {
+    var liveP = _betModalCourse._liveScores[p.num_pmu];
+    displayScore = liveP ? liveP.score_live : (p.score_global_auto || 0);
   } else {
     // auto: score_global_auto, fallback expert, fallback global
     displayScore = p.score_global_auto != null ? p.score_global_auto : (p.score_global_expert != null ? p.score_global_expert : (p.score_global || 0));
@@ -663,9 +674,24 @@ function renderParticipantRowWithBet(p, rank, course, hippodrome) {
 }
 
 // ---- Toggle mode scoring ----
-function setScoringMode(mode) {
+async function setScoringMode(mode) {
   _scoringMode = mode;
   if (_betModalCourse) {
+    if (mode === "cote_reelle") {
+      // Appel API pour recalculer avec cotes fraîches
+      var container = document.getElementById("participants-list");
+      if (container) container.innerHTML = '<div class="stats-loading"><div class="spinner"></div><p>Calcul avec cotes r\u00e9elles\u2026</p></div>';
+      try {
+        var data = await API.liveScores(_betModalCourse.id);
+        // Stocker les scores live dans les participants
+        _betModalCourse._liveScores = {};
+        data.participants.forEach(function(p) {
+          _betModalCourse._liveScores[p.num_pmu] = p;
+        });
+      } catch (e) {
+        console.warn("Erreur live-scores:", e);
+      }
+    }
     renderCourseDetail(_betModalCourse, null);
   }
 }

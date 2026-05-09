@@ -69,6 +69,7 @@ const API = {
 
   // ---- Bilan backtesting ----
   bilan: function (periode) { return apiFetch("/api/bilan?periode=" + (periode || "all")); },
+  liveScores: function (courseId) { return apiFetch("/api/courses/" + courseId + "/live-scores"); },
 };
 
 window.API = API;

@@ -9,7 +9,9 @@ from app.schemas import (
     CourseSchema, CourseDetailSchema, ReunionSchema, ParticipantSchema,
     CourseSuggestionsSchema,
 )
-from app.service import load_programme_today, load_participants_for_course, fetch_and_store_arrivee, refresh_programme_statuts
+from app.service import load_programme_today, load_participants_for_course, fetch_and_store_arrivee, refresh_programme_statuts, _get_db_weights_by_discipline, _get_auto_weights_by_discipline
+from app.scoring import calculer_scores
+from app.pmu_client import pmu_client
 from app.config import today_str
 
 router = APIRouter(prefix="/api", tags=["courses"])
@@ -155,3 +157,68 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
 
     loaded = await load_programme_today(db)
     return {"success": True, "loaded": loaded, "date": date_str}
+
+
+@router.get("/courses/{course_id}/live-scores")
+async def get_live_scores(course_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Recalcule les scores avec les cotes en temps réel depuis l'API PMU.
+    Utilise les poids Auto (calibrés) pour le calcul.
+    """
+    result = await db.execute(
+        select(Course)
+        .where(Course.id == course_id)
+        .options(selectinload(Course.participants), selectinload(Course.reunion))
+    )
+    course = result.scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course introuvable")
+
+    reunion = course.reunion
+
+    # Récupérer les cotes fraîches depuis l'API PMU
+    try:
+        participants_data = await pmu_client.get_participants(
+            reunion.date_str, reunion.num_officiel, course.num_externe
+        )
+    except Exception:
+        raise HTTPException(status_code=502, detail="Impossible de récupérer les cotes PMU")
+
+    if not participants_data:
+        raise HTTPException(status_code=404, detail="Aucun participant PMU")
+
+    # Mettre à jour les cotes en base aussi
+    cotes_map = {p.get("num_pmu"): p.get("cote_actuelle") for p in participants_data if p.get("cote_actuelle")}
+    for p in course.participants:
+        if p.num_pmu in cotes_map:
+            p.cote_actuelle = cotes_map[p.num_pmu]
+    await db.commit()
+
+    # Recalculer les scores avec les cotes fraîches et les poids Auto
+    auto_weights_by_disc = await _get_auto_weights_by_discipline(db)
+    db_weights_by_disc = await _get_db_weights_by_discipline(db)
+
+    scored = calculer_scores(
+        participants_data,
+        course.distance,
+        course.terrain,
+        course.penetrometre_valeur,
+        nombre_partants=course.nombre_partants,
+        hippodrome=reunion.hippodrome_libelle,
+        discipline=course.discipline,
+        db_weights_by_disc=db_weights_by_disc,
+        auto_weights_by_disc=auto_weights_by_disc,
+    )
+
+    # Retourner les participants triés par score auto
+    results = []
+    for p in sorted(scored, key=lambda x: x.get("score_auto", x["score_global"]), reverse=True):
+        results.append({
+            "num_pmu": p["num_pmu"],
+            "nom": p["nom"],
+            "score_live": p.get("score_auto", p["score_global"]),
+            "cote_actuelle": p.get("cote_actuelle"),
+            "score_cote": p.get("score_cote", 0),
+        })
+
+    return {"course_id": course_id, "participants": results}
