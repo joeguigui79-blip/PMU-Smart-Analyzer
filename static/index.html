@@ -149,34 +149,21 @@
 
   <!-- auth.js MUST be first so Auth is available before api.js and app.js -->
   <script src="/static/js/auth.js?v=1"></script>
-  <script src="/static/js/api.js?v=6"></script>
+  <script src="/static/js/api.js?v=7"></script>
   <script src="/static/js/components.js?v=3"></script>
   <script src="/static/js/bets.js?v=3"></script>
-  <script src="/static/js/app.js?v=10"></script>
+  <script src="/static/js/app.js?v=11"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", function () {
-        navigator.serviceWorker.register("/sw.js")
-          .then(function (reg) {
-            console.log("[PWA] SW enregistré, scope:", reg.scope);
-            // Force la mise à jour immédiate du SW
-            reg.update();
-            if (reg.waiting) {
-              reg.waiting.postMessage({ type: "SKIP_WAITING" });
-            }
-            reg.addEventListener("updatefound", function () {
-              var newWorker = reg.installing;
-              if (newWorker) {
-                newWorker.addEventListener("statechange", function () {
-                  if (newWorker.state === "activated") {
-                    window.location.reload();
-                  }
-                });
-              }
-            });
-          })
-          .catch(function (err) { console.warn("[PWA] SW échec:", err); });
-      });
+      // Force unregister old SW then register fresh
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        var p = regs.map(function(r) { return r.unregister(); });
+        return Promise.all(p);
+      }).then(function() {
+        return navigator.serviceWorker.register("/sw.js");
+      }).then(function (reg) {
+        console.log("[PWA] SW enregistré, scope:", reg.scope);
+      }).catch(function (err) { console.warn("[PWA] SW échec:", err); });
     }
   </script>
 </body>

@@ -4,8 +4,8 @@
    avec fallback cache pour le mode offline
    ============================================= */
 
-const CACHE_STATIC  = "pmu-static-v6";
-const CACHE_API     = "pmu-api-v4";
+const CACHE_STATIC  = "pmu-static-v7";
+const CACHE_API     = "pmu-api-v5";
 
 const STATIC_ASSETS = [
   "/",
