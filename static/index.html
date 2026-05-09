@@ -152,12 +152,29 @@
   <script src="/static/js/api.js?v=5"></script>
   <script src="/static/js/components.js?v=3"></script>
   <script src="/static/js/bets.js?v=3"></script>
-  <script src="/static/js/app.js?v=8"></script>
+  <script src="/static/js/app.js?v=9"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
         navigator.serviceWorker.register("/sw.js")
-          .then(function (reg) { console.log("[PWA] SW enregistré, scope:", reg.scope); })
+          .then(function (reg) {
+            console.log("[PWA] SW enregistré, scope:", reg.scope);
+            // Force la mise à jour immédiate du SW
+            reg.update();
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: "SKIP_WAITING" });
+            }
+            reg.addEventListener("updatefound", function () {
+              var newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener("statechange", function () {
+                  if (newWorker.state === "activated") {
+                    window.location.reload();
+                  }
+                });
+              }
+            });
+          })
           .catch(function (err) { console.warn("[PWA] SW échec:", err); });
       });
     }

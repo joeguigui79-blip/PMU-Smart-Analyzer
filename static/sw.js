@@ -1,12 +1,11 @@
 /* =============================================
-   PMU Smart Analyzer — Service Worker v1
-   Stratégie :
-   - Assets statiques  → Cache-first (toujours rapide)
-   - Appels API        → Network-first avec fallback cache
+   PMU Smart Analyzer — Service Worker v5
+   Stratégie : Network-first partout (fiabilité)
+   avec fallback cache pour le mode offline
    ============================================= */
 
-const CACHE_STATIC  = "pmu-static-v4";
-const CACHE_API     = "pmu-api-v2";
+const CACHE_STATIC  = "pmu-static-v5";
+const CACHE_API     = "pmu-api-v3";
 
 const STATIC_ASSETS = [
   "/",
@@ -66,7 +65,14 @@ self.addEventListener("activate", function (event) {
   );
 });
 
-// ---- Fetch : stratégie selon le type de requête ----
+// ---- Message : force skipWaiting depuis la page ----
+self.addEventListener("message", function (event) {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
+// ---- Fetch : Network-first partout ----
 self.addEventListener("fetch", function (event) {
   const url = new URL(event.request.url);
 
@@ -88,9 +94,9 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  // Assets statiques → Cache-first
+  // Assets statiques → Network-first (toujours à jour)
   if (url.pathname.startsWith("/static/") || url.pathname === "/") {
-    event.respondWith(cacheFirstWithNetwork(event.request));
+    event.respondWith(networkFirstWithCache(event.request));
     return;
   }
 });
