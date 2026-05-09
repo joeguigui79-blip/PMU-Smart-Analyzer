@@ -282,7 +282,7 @@ class PMUClient:
         Récupère les pronostics (Equidia) d'une course.
         Retourne {"source": str, "selection": [{"rang": int, "num_partant": int}, ...]} ou None.
         """
-        url = f"{PMU_BASE_URL}/programme/{date_str}/R{reunion_num}/C{course_num}/pronostics"
+        url = f"{PMU_BASE_URL}/{date_str}/R{reunion_num}/C{course_num}/pronostics"
         try:
             resp = await self._client.get(url)
             resp.raise_for_status()
