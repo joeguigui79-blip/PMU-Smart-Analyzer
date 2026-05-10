@@ -47,7 +47,7 @@ function navigate(page, opts) {
       setTimeout(function() { window.scrollTo(0, _coursesScrollPos); }, 50);
     }
   }
-  else if (page === "bets") window.Bets && window.Bets.renderBetsPage();
+  else if (page === "pronostics") loadPronosticsPage();
   else if (page === "stats") loadStatsPage();
   else if (page === "bilan") loadBilanPage();
 }
@@ -693,9 +693,6 @@ function renderParticipantRowWithBet(p, rank, course, hippodrome) {
     "</div>" +
     "</div>" +
     "</div>" +
-    "<div style='padding:0 0 8px;text-align:right'>" +
-    "<button class='bet-btn' onclick=\"event.stopPropagation();showBetModal(" + JSON.stringify(p).replace(/"/g, "&quot;") + ")\">🎯 Parier</button>" +
-    "</div>" +
     "</div>";
 }
 
@@ -1014,7 +1011,7 @@ async function doRefresh() {
     showToast("Données + résultats mis à jour !");
     if (currentPage === "dashboard") loadDashboard();
     else if (currentPage === "courses") loadCourses();
-    else if (currentPage === "bets") window.Bets && window.Bets.renderBetsPage();
+    else if (currentPage === "pronostics") loadPronosticsPage();
   } catch (e) {
     showToast("Erreur lors du rechargement", true);
   }
@@ -1356,6 +1353,111 @@ var _bilanData = null;
 var _bilanPeriode = "all";
 var _bilanDiscipline = "all";
 
+// ---- PAGE PRONOSTICS ----
+var _pronoSeuil = 30;
+
+async function loadPronosticsPage(seuil) {
+  if (seuil !== undefined) _pronoSeuil = seuil;
+  var container = document.getElementById("pronostics-content");
+  if (!container) return;
+  container.innerHTML = '<div class="stats-loading"><div class="spinner"></div><p>Calcul des pronostics\u2026</p></div>';
+
+  try {
+    var data = await API.pronosticsPage(_pronoSeuil);
+    container.innerHTML = renderPronosticsPage(data);
+  } catch (e) {
+    container.innerHTML = '<div class="stats-error">Erreur lors du chargement des pronostics.<br>' + (e.message || "") + '</div>';
+  }
+}
+
+function renderPronosticsPage(data) {
+  var html = "";
+
+  // Header
+  html += '<div class="stats-header">';
+  html += '<h2 class="stats-title">Pronostics du jour</h2>';
+  html += '<p class="stats-subtitle">Bas\u00e9s sur les taux de r\u00e9ussite historiques (' + data.nb_courses + ' courses)</p>';
+  html += '</div>';
+
+  // Filtre seuil de confiance
+  var seuils = [
+    {key: 20, label: "20%+"},
+    {key: 30, label: "30%+"},
+    {key: 40, label: "40%+"},
+    {key: 50, label: "50%+"}
+  ];
+  html += '<div class="scoring-toggle" style="margin-bottom:16px;">';
+  for (var i = 0; i < seuils.length; i++) {
+    var s = seuils[i];
+    html += '<button class="scoring-toggle-btn' + (_pronoSeuil === s.key ? ' active' : '') + '" onclick="loadPronosticsPage(' + s.key + ')">' + s.label + '</button>';
+  }
+  html += '</div>';
+
+  if (!data.courses || data.courses.length === 0) {
+    html += '<div class="stats-error">Aucun pronostic disponible avec ce seuil de confiance.</div>';
+    return html;
+  }
+
+  // Top paris confiance (tous paris toutes courses, triés par taux)
+  var allPronos = [];
+  for (var c = 0; c < data.courses.length; c++) {
+    var course = data.courses[c];
+    for (var p = 0; p < course.pronostics.length; p++) {
+      var prono = course.pronostics[p];
+      allPronos.push({
+        course: course,
+        prono: prono
+      });
+    }
+  }
+  allPronos.sort(function(a, b) { return b.prono.taux - a.prono.taux; });
+
+  // Afficher le top 10 confiance
+  html += '<div class="stats-card" style="margin-bottom:20px">';
+  html += '<h3 style="margin:0 0 12px;color:var(--gold)">\uD83C\uDFC6 Top confiance</h3>';
+  var topN = Math.min(allPronos.length, 10);
+  for (var t = 0; t < topN; t++) {
+    var item = allPronos[t];
+    var chevNums = item.prono.chevaux.map(function(ch) { return ch.num_pmu; }).join("-");
+    var confClass = item.prono.taux >= 50 ? "bilan-green" : item.prono.taux >= 40 ? "bilan-orange" : "bilan-red";
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
+    html += '<span class="' + confClass + '" style="font-weight:700;min-width:45px">' + item.prono.taux + '%</span>';
+    html += '<span style="font-size:12px;color:var(--text-secondary)">R' + item.course.reunion_num + 'C' + item.course.course_num + '</span>';
+    html += '<span style="font-weight:600">' + item.prono.pari_label + '</span>';
+    html += '<span style="font-size:12px;background:var(--surface);padding:2px 6px;border-radius:4px">' + item.prono.mode_label + '</span>';
+    html += '<span style="font-weight:700;color:var(--gold)">' + chevNums + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Détail par course
+  for (var c = 0; c < data.courses.length; c++) {
+    var course = data.courses[c];
+    html += '<div class="stats-card" style="margin-bottom:16px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    html += '<h3 style="margin:0;font-size:15px">R' + course.reunion_num + 'C' + course.course_num + ' \u2014 ' + course.libelle + '</h3>';
+    html += '<span class="badge badge-gray" style="font-size:11px">' + (course.discipline || "") + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">' + (course.hippodrome || "") + '</div>';
+
+    for (var p = 0; p < course.pronostics.length; p++) {
+      var prono = course.pronostics[p];
+      var chevStr = prono.chevaux.map(function(ch) { return ch.num_pmu + "-" + ch.nom; }).join(" + ");
+      var confClass = prono.taux >= 50 ? "bilan-green" : prono.taux >= 40 ? "bilan-orange" : "bilan-red";
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">';
+      html += '<span class="' + confClass + '" style="font-weight:700;min-width:45px;font-size:13px">' + prono.taux + '%</span>';
+      html += '<span style="font-weight:600;font-size:13px">' + prono.pari_label + '</span>';
+      html += '<span style="font-size:11px;background:var(--surface);padding:2px 5px;border-radius:4px">' + prono.mode_label + '</span>';
+      html += '<span style="font-size:13px;color:var(--text-secondary)">' + chevStr + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  return html;
+}
+
+// ---- PAGE BILAN ----
 async function loadBilanPage(periode, discipline) {
   if (periode !== undefined) _bilanPeriode = periode;
   if (discipline !== undefined) _bilanDiscipline = discipline;

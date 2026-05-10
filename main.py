@@ -91,6 +91,9 @@ app.include_router(scoring_router.router)
 app.include_router(stats_router.router)
 app.include_router(bilan_router.router)
 
+from app.routers import pronostics_router
+app.include_router(pronostics_router.router)
+
 # Servir les fichiers statiques
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

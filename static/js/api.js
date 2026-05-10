@@ -71,6 +71,7 @@ const API = {
   bilan: function (periode, discipline) { return apiFetch("/api/bilan?periode=" + (periode || "all") + "&discipline=" + (discipline || "all")); },
   liveScores: function (courseId) { return apiFetch("/api/courses/" + courseId + "/live-scores"); },
   pronostics: function (courseId) { return apiFetch("/api/courses/" + courseId + "/pronostics"); },
+  pronosticsPage: function (seuil) { return apiFetch("/api/pronostics?seuil=" + (seuil || 30)); },
 };
 
 window.API = API;
