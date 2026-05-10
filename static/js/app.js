@@ -1393,6 +1393,8 @@ window.doCalibrate = doCalibrate;
 var _bilanData = null;
 var _bilanPeriode = "all";
 var _bilanDiscipline = "all";
+var _bilanEvolutionPari = "GAGNANT";
+var _bilanEvolutionKeys = ["GAGNANT", "PLACE_1", "COUPLE_GAGNANT", "COUPLE_PLACE_12", "TIERCE_DESORDRE", "QUARTE_DESORDRE"];
 
 // ---- PAGE PRONOSTICS ----
 var _pronoSeuil = 30;
@@ -1518,11 +1520,122 @@ async function loadBilanPage(periode, discipline) {
 
   try {
     _bilanData = await API.bilan(_bilanPeriode, _bilanDiscipline);
+    if (!_bilanData.evolution || !_bilanData.evolution[_bilanEvolutionPari]) {
+      _bilanEvolutionPari = "GAGNANT";
+    }
     container.innerHTML = renderBilanPage(_bilanData);
     _markPageLoaded("bilan");
   } catch (e) {
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement du bilan.<br>' + (e.message || "") + "</div>";
   }
+}
+
+function setBilanEvolutionPari(pariKey) {
+  _bilanEvolutionPari = pariKey;
+  var host = document.getElementById("bilan-evolution-block");
+  if (!host) return;
+  host.outerHTML = renderBilanEvolutionBlock(_bilanData);
+}
+
+function _getBilanPariLabel(pariKey, data) {
+  return data && data.paris && data.paris[pariKey] && data.paris[pariKey].label ? data.paris[pariKey].label : pariKey;
+}
+
+function _buildBilanSeriesPoints(series, mode, chartWidth, chartHeight, padLeft, padTop) {
+  if (!series || !series.length) return "";
+  var stepX = series.length > 1 ? chartWidth / (series.length - 1) : 0;
+  var points = [];
+  for (var i = 0; i < series.length; i++) {
+    var val = series[i][mode];
+    if (val === null || val === undefined) continue;
+    var x = padLeft + (stepX * i);
+    var y = padTop + chartHeight - ((Math.max(0, Math.min(100, val)) / 100) * chartHeight);
+    points.push(x.toFixed(1) + "," + y.toFixed(1));
+  }
+  return points.join(" ");
+}
+
+function renderBilanEvolutionBlock(data) {
+  var evolution = (data && data.evolution) || {};
+  if (!evolution[_bilanEvolutionPari]) {
+    _bilanEvolutionPari = "GAGNANT";
+  }
+  var currentSeries = evolution[_bilanEvolutionPari] || [];
+  var html = '<div class="stats-section" id="bilan-evolution-block">';
+  html += '<h3 class="stats-section-title">Évolution temporelle du taux de réussite</h3>';
+  html += '<p class="stats-subtitle" style="margin-bottom:12px">8 dernières semaines, filtre discipline appliqué, période ignorée pour garder la perspective.</p>';
+  html += '<div class="bilan-evolution-toolbar">';
+  html += '<select class="bilan-evolution-select" onchange="setBilanEvolutionPari(this.value)">';
+  for (var i = 0; i < _bilanEvolutionKeys.length; i++) {
+    var key = _bilanEvolutionKeys[i];
+    html += '<option value="' + key + '"' + (_bilanEvolutionPari === key ? ' selected' : '') + '>' + _getBilanPariLabel(key, data) + '</option>';
+  }
+  html += '</select>';
+  html += '<div class="bilan-evolution-series-legend">';
+  html += '<span class="bilan-evolution-series-item"><span class="bilan-evolution-series-dot auto"></span>Auto</span>';
+  html += '<span class="bilan-evolution-series-item"><span class="bilan-evolution-series-dot expert"></span>Expert</span>';
+  html += '<span class="bilan-evolution-series-item"><span class="bilan-evolution-series-dot sans-cote"></span>Sans cote</span>';
+  html += '</div>';
+  html += '</div>';
+
+  if (!currentSeries.length) {
+    html += '<p class="stats-empty">Pas assez de données sur les dernières semaines pour ce type de pari.</p>';
+    html += '</div>';
+    return html;
+  }
+
+  var width = 640;
+  var height = 280;
+  var padLeft = 42;
+  var padRight = 12;
+  var padTop = 16;
+  var padBottom = 34;
+  var chartWidth = width - padLeft - padRight;
+  var chartHeight = height - padTop - padBottom;
+  var yTicks = [0, 25, 50, 75, 100];
+  var modes = [
+    { key: "auto", color: "var(--green)" },
+    { key: "expert", color: "var(--gold)" },
+    { key: "sans_cote", color: "var(--blue)" }
+  ];
+
+  html += '<div class="bilan-evolution-card">';
+  html += '<svg class="bilan-evolution-chart" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Évolution hebdomadaire du taux de réussite">';
+
+  for (var t = 0; t < yTicks.length; t++) {
+    var tick = yTicks[t];
+    var tickY = padTop + chartHeight - ((tick / 100) * chartHeight);
+    html += '<line x1="' + padLeft + '" y1="' + tickY + '" x2="' + (padLeft + chartWidth) + '" y2="' + tickY + '" stroke="rgba(255,255,255,0.10)" stroke-width="1"></line>';
+    html += '<text x="' + (padLeft - 8) + '" y="' + (tickY + 4) + '" text-anchor="end" class="bilan-evolution-axis-label">' + tick + '%</text>';
+  }
+
+  html += '<line x1="' + padLeft + '" y1="' + padTop + '" x2="' + padLeft + '" y2="' + (padTop + chartHeight) + '" stroke="rgba(255,255,255,0.22)" stroke-width="1.2"></line>';
+  html += '<line x1="' + padLeft + '" y1="' + (padTop + chartHeight) + '" x2="' + (padLeft + chartWidth) + '" y2="' + (padTop + chartHeight) + '" stroke="rgba(255,255,255,0.22)" stroke-width="1.2"></line>';
+
+  var stepX = currentSeries.length > 1 ? chartWidth / (currentSeries.length - 1) : 0;
+  for (var x = 0; x < currentSeries.length; x++) {
+    var xPos = padLeft + (stepX * x);
+    html += '<text x="' + xPos + '" y="' + (height - 10) + '" text-anchor="middle" class="bilan-evolution-axis-label">' + currentSeries[x].semaine.replace(/^[0-9]{4}-/, "") + '</text>';
+  }
+
+  for (var m = 0; m < modes.length; m++) {
+    var mode = modes[m];
+    var points = _buildBilanSeriesPoints(currentSeries, mode.key, chartWidth, chartHeight, padLeft, padTop);
+    if (!points) continue;
+    html += '<polyline fill="none" stroke="' + mode.color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="' + points + '"></polyline>';
+    for (var s = 0; s < currentSeries.length; s++) {
+      var val = currentSeries[s][mode.key];
+      if (val === null || val === undefined) continue;
+      var cx = padLeft + (stepX * s);
+      var cy = padTop + chartHeight - ((Math.max(0, Math.min(100, val)) / 100) * chartHeight);
+      html += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="3.5" fill="' + mode.color + '"></circle>';
+    }
+  }
+
+  html += '</svg>';
+  html += '</div>';
+  html += '</div>';
+  return html;
 }
 
 function renderBilanPage(data) {
@@ -1646,6 +1759,9 @@ function renderBilanPage(data) {
   html += '</div>';
 
   html += '</div>'; // stats-section
+  html += renderBilanEvolutionBlock(data);
   html += '</div>'; // stats-page
   return html;
 }
+
+window.setBilanEvolutionPari = setBilanEvolutionPari;

@@ -105,6 +105,85 @@ PARIS_ALIASES: dict[str, list[str]] = {
 }
 
 MODES = ["auto", "expert", "sans_cote"]
+EVOLUTION_PARIS = [
+    "GAGNANT",
+    "PLACE_1",
+    "COUPLE_GAGNANT",
+    "COUPLE_PLACE_12",
+    "TIERCE_DESORDRE",
+    "QUARTE_DESORDRE",
+]
+
+
+def _is_discipline_match(course_discipline: str, discipline_filter: Optional[str]) -> bool:
+    if not discipline_filter or discipline_filter == "all":
+        return True
+    if discipline_filter == "OBSTACLE":
+        return course_discipline in {"HAIE", "STEEPLE", "CROSS", "OBSTACLE"}
+    return course_discipline == discipline_filter
+
+
+def _week_key_from_date_str(date_str: str) -> Optional[str]:
+    if not date_str:
+        return None
+    try:
+        course_date = datetime.strptime(date_str, "%d%m%Y").date()
+    except ValueError:
+        return None
+    iso_year, iso_week, _ = course_date.isocalendar()
+    return f"{iso_year}-S{iso_week:02d}"
+
+
+def _init_stats(pari_keys: list[str]) -> dict[str, dict[str, dict[str, int]]]:
+    return {
+        pari_key: {
+            mode: {"evaluees": 0, "gagnes": 0} for mode in MODES
+        }
+        for pari_key in pari_keys
+    }
+
+
+def _process_course_for_stats(
+    course: Course,
+    pari_keys: list[str],
+    stats: dict[str, dict[str, dict[str, int]]],
+) -> bool:
+    all_participants = course.participants
+    participants_with_pos = [p for p in all_participants if p.position_arrivee is not None]
+    if len(participants_with_pos) < 2:
+        return False
+
+    positions = {p.num_pmu: p.position_arrivee for p in participants_with_pos}
+    sorted_by_mode = {
+        mode: sorted(all_participants, key=lambda p, m=mode: _score_for_mode(p, m), reverse=True)
+        for mode in MODES
+    }
+
+    for pari_key in pari_keys:
+        if not _pari_in_disponibles(pari_key, course.paris_disponibles):
+            continue
+
+        for mode in MODES:
+            stats[pari_key][mode]["evaluees"] += 1
+            if _simulate_pari(pari_key, sorted_by_mode[mode], positions):
+                stats[pari_key][mode]["gagnes"] += 1
+
+    return True
+
+
+def _serialize_stats(stats: dict[str, dict[str, dict[str, int]]], labels: dict[str, str]) -> dict[str, dict]:
+    result = {}
+    for pari_key, label in labels.items():
+        result[pari_key] = {"label": label}
+        for mode in MODES:
+            ev = stats[pari_key][mode]["evaluees"]
+            ga = stats[pari_key][mode]["gagnes"]
+            result[pari_key][mode] = {
+                "evaluees": ev,
+                "gagnes": ga,
+                "taux": round(100 * ga / ev, 1) if ev > 0 else None,
+            }
+    return result
 
 
 def _score_for_mode(p: Participant, mode: str) -> float:
@@ -396,7 +475,6 @@ async def get_bilan(
     Retourne le bilan de backtesting pour chaque type de pari et chaque mode de scoring.
     Filtre par période et par discipline.
     """
-    # Déterminer la date de début selon la période
     paris_tz = ZoneInfo("Europe/Paris")
     now = datetime.now(paris_tz)
     date_from: Optional[str] = None
@@ -409,80 +487,54 @@ async def get_bilan(
         date_from = (now - timedelta(days=30)).strftime("%d%m%Y")
     elif periode == "month":
         date_from = now.replace(day=1).strftime("%d%m%Y")
-    # else: all — pas de filtre
 
-    # Récupérer les courses terminées avec filtre date + discipline
-    # selectinload évite le N+1 : tous les participants sont chargés en une seule requête IN
     query = (
         select(Course)
         .join(Reunion)
         .options(selectinload(Course.participants))
         .where(Course.statut_resultat == "TERMINE")
     )
-    if date_from:
-        query = query.where(Reunion.date_str >= date_from)
-    if discipline and discipline != "all":
-        # Regrouper tous les obstacles sous "OBSTACLE"
-        if discipline == "OBSTACLE":
-            query = query.where(Course.discipline.in_(["HAIE", "STEEPLE", "CROSS", "OBSTACLE"]))
-        else:
-            query = query.where(Course.discipline == discipline)
     courses_result = await db.execute(query)
     courses = courses_result.scalars().all()
 
-    # Initialiser les compteurs
-    stats: dict[str, dict[str, dict]] = {}
-    for pari_key in PARIS_LABELS:
-        stats[pari_key] = {
-            mode: {"evaluees": 0, "gagnes": 0} for mode in MODES
-        }
-
+    stats = _init_stats(list(PARIS_LABELS.keys()))
+    evolution_stats: dict[str, dict[str, dict[str, dict[str, int]]]] = {}
     total_courses_with_results = 0
 
     for course in courses:
-        # Les participants sont déjà chargés via selectinload — pas de requête supplémentaire
-        all_participants = course.participants
+        course_date_str = course.reunion.date_str if course.reunion else None
+        matches_period = not date_from or (course_date_str and course_date_str >= date_from)
+        matches_discipline = _is_discipline_match(course.discipline, discipline)
 
-        # Vérifier qu'il y a des arrivées renseignées
-        participants_with_pos = [p for p in all_participants if p.position_arrivee is not None]
-        if len(participants_with_pos) < 2:
-            continue
+        if matches_period and matches_discipline:
+            if _process_course_for_stats(course, list(PARIS_LABELS.keys()), stats):
+                total_courses_with_results += 1
 
-        total_courses_with_results += 1
+        if matches_discipline:
+            week_key = _week_key_from_date_str(course_date_str or "")
+            if week_key:
+                week_stats = evolution_stats.setdefault(week_key, _init_stats(EVOLUTION_PARIS))
+                _process_course_for_stats(course, EVOLUTION_PARIS, week_stats)
 
-        # Construire le dict positions (seulement ceux avec position)
-        positions = {p.num_pmu: p.position_arrivee for p in participants_with_pos}
-
-        # Pré-calculer le tri par mode UNE seule fois par course (3 tris au lieu de 3 × nb_paris)
-        sorted_by_mode = {
-            mode: sorted(all_participants, key=lambda p, m=mode: _score_for_mode(p, m), reverse=True)
-            for mode in MODES
-        }
-
-        # Pour chaque type de pari disponible dans la course
-        for pari_key in PARIS_LABELS:
-            if not _pari_in_disponibles(pari_key, course.paris_disponibles):
+    paris_result = _serialize_stats(stats, PARIS_LABELS)
+    latest_weeks = sorted(evolution_stats.keys())[-8:]
+    evolution_result = {}
+    for pari_key in EVOLUTION_PARIS:
+        series = []
+        for week_key in latest_weeks:
+            week_stats = evolution_stats[week_key][pari_key]
+            if not any(week_stats[mode]["evaluees"] > 0 for mode in MODES):
                 continue
-
-            for mode in MODES:
-                stats[pari_key][mode]["evaluees"] += 1
-                if _simulate_pari(pari_key, sorted_by_mode[mode], positions):
-                    stats[pari_key][mode]["gagnes"] += 1
-
-    # Construire la réponse finale
-    paris_result = {}
-    for pari_key, label in PARIS_LABELS.items():
-        paris_result[pari_key] = {"label": label}
-        for mode in MODES:
-            ev = stats[pari_key][mode]["evaluees"]
-            ga = stats[pari_key][mode]["gagnes"]
-            paris_result[pari_key][mode] = {
-                "evaluees": ev,
-                "gagnes": ga,
-                "taux": round(100 * ga / ev, 1) if ev > 0 else None,
-            }
+            series.append({
+                "semaine": week_key,
+                "auto": round(100 * week_stats["auto"]["gagnes"] / week_stats["auto"]["evaluees"], 1) if week_stats["auto"]["evaluees"] > 0 else None,
+                "expert": round(100 * week_stats["expert"]["gagnes"] / week_stats["expert"]["evaluees"], 1) if week_stats["expert"]["evaluees"] > 0 else None,
+                "sans_cote": round(100 * week_stats["sans_cote"]["gagnes"] / week_stats["sans_cote"]["evaluees"], 1) if week_stats["sans_cote"]["evaluees"] > 0 else None,
+            })
+        evolution_result[pari_key] = series
 
     return {
         "total_courses": total_courses_with_results,
         "paris": paris_result,
+        "evolution": evolution_result,
     }
