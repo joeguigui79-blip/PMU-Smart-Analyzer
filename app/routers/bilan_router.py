@@ -391,8 +391,8 @@ async def get_bilan(
     if date_from:
         query = query.where(Reunion.date_str >= date_from)
     if discipline and discipline != "all":
-        # Regrouper HAIE/STEEPLE/CROSS sous "HAIE"
-        if discipline == "HAIE":
+        # Regrouper tous les obstacles sous "OBSTACLE"
+        if discipline == "OBSTACLE":
             query = query.where(Course.discipline.in_(["HAIE", "STEEPLE", "CROSS", "OBSTACLE"]))
         else:
             query = query.where(Course.discipline == discipline)

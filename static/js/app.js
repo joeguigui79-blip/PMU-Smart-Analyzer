@@ -1404,7 +1404,10 @@ function renderBilanPage(data) {
     {key: "PLAT", label: "Plat"},
     {key: "TROT_MONTE", label: "Mont\u00e9"},
     {key: "TROT_ATTELE", label: "Attel\u00e9"},
-    {key: "HAIE", label: "Haie/Obstacle"}
+    {key: "OBSTACLE", label: "Obstacle"},
+    {key: "HAIE", label: "Haie"},
+    {key: "STEEPLE", label: "Steeple"},
+    {key: "CROSS", label: "Cross"}
   ];
   html += '<div class="scoring-toggle" style="margin-bottom:16px;">';
   for (var i = 0; i < disciplines.length; i++) {

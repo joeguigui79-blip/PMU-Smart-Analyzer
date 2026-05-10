@@ -8,6 +8,25 @@ from app.config import PMU_BASE_URL, PMU_PARTICIPANTS_URL, PMU_ARRIVEE_URL, PARI
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_discipline(discipline: str, specialite: str) -> str:
+    """
+    Résout la discipline précise pour stockage.
+    Pour les obstacles, on utilise le champ 'discipline' de l'API (HAIE, STEEPLECHASE, CROSS_COUNTRY).
+    Pour les autres, on utilise 'specialite' (PLAT, TROT_ATTELE, TROT_MONTE).
+    """
+    disc_upper = discipline.upper()
+    if disc_upper in ("HAIE", "HAIES"):
+        return "HAIE"
+    if disc_upper in ("STEEPLECHASE", "STEEPLE_CHASE", "STEEPLE"):
+        return "STEEPLE"
+    if disc_upper in ("CROSS_COUNTRY", "CROSS"):
+        return "CROSS"
+    # Pour plat et trot, specialite est plus précis
+    if specialite:
+        return specialite.upper()
+    return disc_upper or "PLAT"
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; PMU-Smart-Analyzer/1.0)",
     "Accept": "application/json",
@@ -65,7 +84,7 @@ class PMUClient:
                     "libelle_court": c.get("libelleCourt", ""),
                     "heure_depart": _ts_to_datetime(c.get("heureDepart")),
                     "distance": c.get("distance", 0),
-                    "discipline": c.get("specialite", c.get("discipline", "PLAT")),
+                    "discipline": _resolve_discipline(c.get("discipline", ""), c.get("specialite", "")),
                     "specialite": c.get("specialite", c.get("discipline", "PLAT")),
                     "terrain": penet.get("libelle", ""),
                     "penetrometre_valeur": penet.get("valeur"),
