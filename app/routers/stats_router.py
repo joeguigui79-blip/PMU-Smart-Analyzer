@@ -10,6 +10,7 @@ import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import Participant, Course, CalibrationWeight, Reunion
@@ -41,7 +42,9 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
     await refresh_programme_statuts(db)
 
     courses_result = await db.execute(
-        select(Course).where(Course.statut_resultat == "TERMINE")
+        select(Course)
+        .options(selectinload(Course.participants))
+        .where(Course.statut_resultat == "TERMINE")
     )
     courses = courses_result.scalars().all()
 
@@ -58,13 +61,7 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
     for course in courses:
         disc = _normalize_discipline(course.discipline)
 
-        p_result = await db.execute(
-            select(Participant).where(
-                Participant.course_id == course.id,
-                Participant.position_arrivee.isnot(None),
-            )
-        )
-        participants = p_result.scalars().all()
+        participants = [p for p in course.participants if p.position_arrivee is not None]
         if len(participants) < 2:
             continue
 
@@ -159,6 +156,7 @@ async def _compute_evolution(db: AsyncSession) -> dict:
     courses_result = await db.execute(
         select(Course)
         .join(Reunion)
+        .options(selectinload(Course.participants))
         .where(Course.statut_resultat == "TERMINE")
     )
     courses = courses_result.scalars().all()
@@ -183,13 +181,7 @@ async def _compute_evolution(db: AsyncSession) -> dict:
         else:
             continue
 
-        p_result = await db.execute(
-            select(Participant).where(
-                Participant.course_id == course.id,
-                Participant.position_arrivee.isnot(None),
-            )
-        )
-        participants = p_result.scalars().all()
+        participants = [p for p in course.participants if p.position_arrivee is not None]
         if not participants:
             continue
 
