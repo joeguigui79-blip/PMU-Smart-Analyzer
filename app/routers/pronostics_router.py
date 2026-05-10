@@ -79,7 +79,7 @@ PARIS_LABELS = {
     "MULTI_7": "Multi en 7",
     "TRIO_ORDRE": "Trio Ordre",
     "TRIO": "Trio",
-    "SUPER4": "Super4",
+    "SUPER4": "Super 4",
 }
 
 MODES = ["auto", "expert", "sans_cote"]
