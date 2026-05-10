@@ -70,14 +70,7 @@ async def get_course(course_id: int, db: AsyncSession = Depends(get_db)):
     has_positions = any(p.position_arrivee is not None for p in course.participants)
     if not has_positions:
         await fetch_and_store_arrivee(db, course.id)
-
-    await db.refresh(course)
-    result2 = await db.execute(
-        select(Course)
-        .where(Course.id == course_id)
-        .options(selectinload(Course.participants), selectinload(Course.reunion))
-    )
-    course = result2.scalar_one()
+        await db.refresh(course, attribute_names=["participants"])
 
     participants = sorted(course.participants, key=lambda p: p.score_global, reverse=True)
     value_bets = [p for p in participants if p.is_value_bet]
@@ -124,14 +117,15 @@ async def get_course_suggestions(course_id: int, db: AsyncSession = Depends(get_
 
     # Charger les participants si nécessaire
     await load_participants_for_course(db, course, course.reunion)
-    await db.refresh(course)
+    await db.refresh(course, attribute_names=["participants"])
 
-    result2 = await db.execute(
-        select(Participant)
-        .where(Participant.course_id == course_id)
-        .order_by(Participant.score_global.desc())
-    )
-    participants = result2.scalars().all()
+    participants = (
+        await db.execute(
+            select(Participant)
+            .where(Participant.course_id == course_id)
+            .order_by(Participant.score_global.desc())
+        )
+    ).scalars().all()
 
     if not participants:
         return CourseSuggestionsSchema()
