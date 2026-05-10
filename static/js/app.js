@@ -348,8 +348,10 @@ function renderStatsChart(stats) {
     const label = s.date ? s.date.slice(8, 10) + '/' + s.date.slice(5, 7) : "—";
     html += "<div class='stat-bar-col'>" +
       "<div class='stat-bar-track'>" +
-      "<div class='stat-bar-fill vb' style='height:" + pctVb + "%' title='Value Bets: " + (s.nb_value_bets || 0) + "'></div>" +
+      "<div class='stat-bar-pair'>" +
       "<div class='stat-bar-fill courses' style='height:" + pct + "%' title='Courses: " + (s.nb_courses || 0) + "'></div>" +
+      "<div class='stat-bar-fill vb' style='height:" + pctVb + "%' title='Value Bets: " + (s.nb_value_bets || 0) + "'></div>" +
+      "</div>" +
       "</div>" +
       "<div class='stat-bar-label'>" + label + "</div>" +
       "</div>";
