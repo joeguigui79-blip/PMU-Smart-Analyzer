@@ -19,7 +19,9 @@ Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Multi en 5    : top5, au moins 4 dans top4
   - Multi en 6    : top6, au moins 4 dans top4
   - Multi en 7    : top7, au moins 4 dans top4
-  - Trio          : top3 tous dans top3
+  - Trio Ordre    : top3 dans l'ordre exact (1er, 2ème, 3ème)
+  - Trio          : top3 tous dans top3 dans n'importe quel ordre
+  - Super4        : top4 dans l'ordre exact, uniquement si nb_partants entre 5 et 9
 
 Seuls les paris présents dans course.paris_disponibles sont comptabilisés.
 Seules les courses avec des position_arrivee renseignées sont prises en compte.
@@ -66,7 +68,9 @@ PARIS_LABELS = {
     "MULTI_5":          "Multi en 5",
     "MULTI_6":          "Multi en 6",
     "MULTI_7":          "Multi en 7",
+    "TRIO_ORDRE":       "Trio Ordre",
     "TRIO":             "Trio",
+    "SUPER4":           "Super4",
 }
 
 # Alias supplémentaires pour la correspondance avec paris_disponibles
@@ -94,7 +98,9 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "MULTI_5":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
     "MULTI_6":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
     "MULTI_7":          ["MULTI", "E_MULTI"],
+    "TRIO_ORDRE":       ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
     "TRIO":             ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
+    "SUPER4":           ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "quarte", "QUARTE+"],
 }
 
 MODES = ["auto", "expert", "sans_cote"]
@@ -350,13 +356,31 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
         real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
         return len(top7 & real_top4) >= 4
 
+    elif pari_key == "TRIO_ORDRE":
+        # top3 dans l'ordre exact (1er, 2ème, 3ème)
+        if len(sorted_participants) < 3:
+            return False
+        return (positions.get(sorted_participants[0].num_pmu) == 1
+                and positions.get(sorted_participants[1].num_pmu) == 2
+                and positions.get(sorted_participants[2].num_pmu) == 3)
+
     elif pari_key == "TRIO":
-        # top3 tous dans top3
+        # top3 tous dans top3 dans n'importe quel ordre
         if len(sorted_participants) < 3:
             return False
         top3 = {sorted_participants[i].num_pmu for i in range(3)}
         real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
         return top3 == real_top3
+
+    elif pari_key == "SUPER4":
+        # top4 dans l'ordre exact — uniquement valide si nb_partants entre 5 et 9
+        # (le filtrage partants est géré dans la boucle principale)
+        if len(sorted_participants) < 4:
+            return False
+        return (positions.get(sorted_participants[0].num_pmu) == 1
+                and positions.get(sorted_participants[1].num_pmu) == 2
+                and positions.get(sorted_participants[2].num_pmu) == 3
+                and positions.get(sorted_participants[3].num_pmu) == 4)
 
     return False
 
@@ -429,6 +453,12 @@ async def get_bilan(
         for pari_key in PARIS_LABELS:
             if not _pari_in_disponibles(pari_key, course.paris_disponibles):
                 continue
+
+            # SUPER4 : uniquement si nb_partants entre 5 et 9
+            if pari_key == "SUPER4":
+                nb_part = course.nombre_partants or 0
+                if not (5 <= nb_part <= 9):
+                    continue
 
             # Pour chaque mode — trier TOUS les participants par score
             for mode in MODES:
