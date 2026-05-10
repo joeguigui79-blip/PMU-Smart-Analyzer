@@ -3,7 +3,7 @@ Service layer : chargement et mise à jour des données PMU en base.
 """
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -12,6 +12,10 @@ from app.models import Reunion, Course, Participant, Bet, ScoringWeight
 from app.pmu_client import pmu_client
 from app.scoring import calculer_scores, load_weights_from_config_or_db
 from app.config import today_str
+
+# Debounce de l'auto-calibration : ne calibrer qu'une fois toutes les 15 minutes max
+_last_calibration: datetime | None = None
+CALIBRATION_DEBOUNCE_MINUTES = 15
 
 # Statuts PMU qui indiquent qu'une course est terminée
 STATUTS_TERMINES = frozenset({
@@ -380,13 +384,20 @@ async def fetch_and_store_arrivee(db: AsyncSession, course_id: int) -> bool:
     # Évaluer les paris liés à cette course
     await evaluer_paris_pour_course(db, course_id)
 
-    # Recalibrer automatiquement les poids auto après chaque arrivée
-    try:
-        from app.calibration import calibrate_and_store
-        await calibrate_and_store(db)
-        logger.info("Auto-calibration des poids effectuée après arrivée course %d", course_id)
-    except Exception as e:
-        logger.warning("Erreur auto-calibration: %s", e)
+    # Recalibrer automatiquement les poids auto (debounce : max 1 fois / 15 min)
+    global _last_calibration
+    now = datetime.now()
+    if _last_calibration is None or (now - _last_calibration) > timedelta(minutes=CALIBRATION_DEBOUNCE_MINUTES):
+        try:
+            from app.calibration import calibrate_and_store
+            await calibrate_and_store(db)
+            _last_calibration = now
+            logger.info("Auto-calibration des poids effectuée après arrivée course %d", course_id)
+        except Exception as e:
+            logger.warning("Erreur auto-calibration: %s", e)
+    else:
+        remaining = CALIBRATION_DEBOUNCE_MINUTES - int((now - _last_calibration).total_seconds() / 60)
+        logger.debug("Auto-calibration ignorée (debounce, prochaine dans ~%d min)", remaining)
 
     return True
 
