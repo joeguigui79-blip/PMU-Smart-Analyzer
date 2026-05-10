@@ -8,7 +8,32 @@ var _coursesLoaded = false;
 let _betModalCourse = null;   // course courante pour le modal de pari
 var _scoringMode = "auto"; // "auto" | "expert" | "sans_cote"
 
+// Cache de chargement par page : null = jamais chargé, sinon timestamp (ms)
+var _pageLoaded = {
+  dashboard: null,
+  courses: null,
+  stats: null,
+  bilan: null,
+  pronostics: null
+};
+var PAGE_TTL_MS = 60 * 1000; // 60 secondes
+
 const H = () => window.Components;
+
+// ---- Helpers cache ----
+function _isPageFresh(page) {
+  var ts = _pageLoaded[page];
+  if (!ts) return false;
+  return (Date.now() - ts) < PAGE_TTL_MS;
+}
+
+function _markPageLoaded(page) {
+  _pageLoaded[page] = Date.now();
+}
+
+function _invalidatePage(page) {
+  _pageLoaded[page] = null;
+}
 
 // ---- Page Transitions ----
 function navigate(page, opts) {
@@ -38,18 +63,26 @@ function navigate(page, opts) {
 
   currentPage = page;
 
-  if (page === "dashboard") loadDashboard();
-  else if (page === "courses") {
-    if (!_coursesLoaded) {
-      loadCourses();
-    } else {
-      // Restaurer la position de scroll
-      setTimeout(function() { window.scrollTo(0, _coursesScrollPos); }, 50);
+  if (page === "dashboard") {
+    if (!_isPageFresh("dashboard")) {
+      loadDashboard();
+    }
+  } else if (page === "courses") {
+    // Les courses changent souvent (statuts) : toujours recharger
+    loadCourses();
+  } else if (page === "pronostics") {
+    if (!_isPageFresh("pronostics")) {
+      loadPronosticsPage();
+    }
+  } else if (page === "stats") {
+    if (!_isPageFresh("stats")) {
+      loadStatsPage();
+    }
+  } else if (page === "bilan") {
+    if (!_isPageFresh("bilan")) {
+      loadBilanPage();
     }
   }
-  else if (page === "pronostics") loadPronosticsPage();
-  else if (page === "stats") loadStatsPage();
-  else if (page === "bilan") loadBilanPage();
 }
 
 // ---- Toast ----
@@ -140,6 +173,7 @@ async function loadDashboard() {
       return;
     }
     renderDashboard(data, stats, accuracy, discStats);
+    _markPageLoaded("dashboard");
   } catch (e) {
     console.error("Dashboard error:", e);
     content.innerHTML = "<div class='empty-state'><div class='empty-icon'>⚠️</div><div class='empty-title'>Impossible de charger les données</div><p style='color:var(--text-muted);font-size:13px'>Vérifiez votre connexion internet</p></div>";
@@ -335,6 +369,9 @@ async function loadCourses() {
     const reunions = await API.reunions();
     renderCoursesList(reunions);
     _coursesLoaded = true;
+    _markPageLoaded("courses");
+    // Restaurer la position de scroll si applicable
+    setTimeout(function() { window.scrollTo(0, _coursesScrollPos); }, 50);
   } catch (e) {
     content.innerHTML = "<div class='empty-state'><div class='empty-icon'>⚠️</div><div class='empty-title'>Erreur de chargement</div></div>";
     showToast("Erreur de chargement", true);
@@ -1000,7 +1037,9 @@ function closeModal() {
 // ---- Refresh ----
 async function doRefresh() {
   showToast("Rechargement en cours...");
-  _coursesLoaded = false;  // Forcer le rechargement des courses
+  // Invalider la page courante pour forcer rechargement
+  _invalidatePage(currentPage);
+  _coursesLoaded = false;
   try {
     await API.refresh();
     await API.refreshProgramme();
@@ -1010,6 +1049,8 @@ async function doRefresh() {
     if (currentPage === "dashboard") loadDashboard();
     else if (currentPage === "courses") loadCourses();
     else if (currentPage === "pronostics") loadPronosticsPage();
+    else if (currentPage === "stats") loadStatsPage();
+    else if (currentPage === "bilan") loadBilanPage();
   } catch (e) {
     showToast("Erreur lors du rechargement", true);
   }
@@ -1151,6 +1192,7 @@ async function loadStatsPage() {
       API.statsCalibration(),
     ]);
     container.innerHTML = renderStatsPage(scoringData, calibData);
+    _markPageLoaded("stats");
   } catch (e) {
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement des statistiques.<br>' + (e.message || "") + "</div>";
   }
@@ -1330,7 +1372,8 @@ async function doCalibrate() {
     var msg = "Calibration terminée. Disciplines calibrées: " +
       ((result.disciplines_calibrated || []).join(", ") || "aucune");
     showToast(msg);
-    // Recharger la page stats
+    // Invalider le cache stats et recharger
+    _invalidatePage("stats");
     loadStatsPage();
   } catch (e) {
     showToast("Erreur lors de la calibration: " + (e.message || ""), true);
@@ -1355,7 +1398,10 @@ var _bilanDiscipline = "all";
 var _pronoSeuil = 30;
 
 async function loadPronosticsPage(seuil) {
-  if (seuil !== undefined) _pronoSeuil = seuil;
+  if (seuil !== undefined) {
+    _pronoSeuil = seuil;
+    _invalidatePage("pronostics"); // filtre changé → rechargement forcé
+  }
   var container = document.getElementById("pronostics-content");
   if (!container) return;
   container.innerHTML = '<div class="stats-loading"><div class="spinner"></div><p>Calcul des pronostics\u2026</p></div>';
@@ -1363,6 +1409,7 @@ async function loadPronosticsPage(seuil) {
   try {
     var data = await API.pronosticsPage(_pronoSeuil);
     container.innerHTML = renderPronosticsPage(data);
+    _markPageLoaded("pronostics");
   } catch (e) {
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement des pronostics.<br>' + (e.message || "") + '</div>';
   }
@@ -1457,8 +1504,14 @@ function renderPronosticsPage(data) {
 
 // ---- PAGE BILAN ----
 async function loadBilanPage(periode, discipline) {
-  if (periode !== undefined) _bilanPeriode = periode;
-  if (discipline !== undefined) _bilanDiscipline = discipline;
+  if (periode !== undefined) {
+    _bilanPeriode = periode;
+    _invalidatePage("bilan"); // filtre changé → rechargement forcé
+  }
+  if (discipline !== undefined) {
+    _bilanDiscipline = discipline;
+    _invalidatePage("bilan"); // filtre changé → rechargement forcé
+  }
   var container = document.getElementById("bilan-content");
   if (!container) return;
   container.innerHTML = '<div class="stats-loading"><div class="spinner"></div><p>Calcul du bilan en cours\u2026</p></div>';
@@ -1466,6 +1519,7 @@ async function loadBilanPage(periode, discipline) {
   try {
     _bilanData = await API.bilan(_bilanPeriode, _bilanDiscipline);
     container.innerHTML = renderBilanPage(_bilanData);
+    _markPageLoaded("bilan");
   } catch (e) {
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement du bilan.<br>' + (e.message || "") + "</div>";
   }
