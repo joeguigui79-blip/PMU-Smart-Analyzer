@@ -64,48 +64,55 @@ async def get_dashboard(db: AsyncSession = Depends(get_db)):
 
 @router.get("/stats", response_model=list[DailyStatsSchema])
 async def get_stats(db: AsyncSession = Depends(get_db)):
-    """Statistiques des 7 derniers jours (upsert depuis la DB en temps réel)."""
+    """Statistiques des 7 derniers jours — 3 requêtes groupées au lieu de 21."""
     today = datetime.utcnow().date()
-    days = []
+
+    # Préparer les 7 jours : date ISO (clé de sortie) et DDMMYYYY (filtre DB)
+    date_range = []
     for i in range(6, -1, -1):
         day = today - timedelta(days=i)
-        day_str = day.strftime("%Y-%m-%d")
-        # DDMMYYYY format used in reunions
-        ddmmyyyy = day.strftime("%d%m%Y")
+        date_range.append((day.strftime("%Y-%m-%d"), day.strftime("%d%m%Y")))
 
-        # Count courses for that day
-        courses_result = await db.execute(
-            select(func.count(Course.id))
-            .join(Reunion)
-            .where(Reunion.date_str == ddmmyyyy)
-        )
-        nb_courses = courses_result.scalar_one() or 0
+    ddmmyyyy_list = [ddmmyyyy for _, ddmmyyyy in date_range]
 
-        # Count value bets
-        vb_result = await db.execute(
-            select(func.count(Participant.id))
-            .join(Course)
-            .join(Reunion)
-            .where(Reunion.date_str == ddmmyyyy)
-            .where(Participant.is_value_bet.is_(True))
-        )
-        nb_value_bets = vb_result.scalar_one() or 0
+    # 1. Nombre de courses par jour
+    courses_rows = await db.execute(
+        select(Reunion.date_str, func.count(Course.id))
+        .join(Course, Course.reunion_id == Reunion.id)
+        .where(Reunion.date_str.in_(ddmmyyyy_list))
+        .group_by(Reunion.date_str)
+    )
+    courses_by_date: dict[str, int] = {row[0]: row[1] for row in courses_rows}
 
-        # Count finished courses
-        fin_result = await db.execute(
-            select(func.count(Course.id))
-            .join(Reunion)
-            .where(Reunion.date_str == ddmmyyyy)
-            .where(Course.statut_resultat == 'TERMINE')
-        )
-        nb_finished = fin_result.scalar_one() or 0
+    # 2. Nombre de value bets par jour
+    vb_rows = await db.execute(
+        select(Reunion.date_str, func.count(Participant.id))
+        .join(Course, Course.reunion_id == Reunion.id)
+        .join(Participant, Participant.course_id == Course.id)
+        .where(Reunion.date_str.in_(ddmmyyyy_list))
+        .where(Participant.is_value_bet.is_(True))
+        .group_by(Reunion.date_str)
+    )
+    vb_by_date: dict[str, int] = {row[0]: row[1] for row in vb_rows}
 
-        days.append(DailyStatsSchema(
+    # 3. Nombre de courses terminées par jour
+    fin_rows = await db.execute(
+        select(Reunion.date_str, func.count(Course.id))
+        .join(Course, Course.reunion_id == Reunion.id)
+        .where(Reunion.date_str.in_(ddmmyyyy_list))
+        .where(Course.statut_resultat == 'TERMINE')
+        .group_by(Reunion.date_str)
+    )
+    fin_by_date: dict[str, int] = {row[0]: row[1] for row in fin_rows}
+
+    # Assembler les résultats
+    return [
+        DailyStatsSchema(
             date=day_str,
-            nb_courses=nb_courses,
-            nb_value_bets=nb_value_bets,
+            nb_courses=courses_by_date.get(ddmmyyyy, 0),
+            nb_value_bets=vb_by_date.get(ddmmyyyy, 0),
             nb_top_picks_correct=0,
-            nb_courses_finished=nb_finished,
-        ))
-
-    return days
+            nb_courses_finished=fin_by_date.get(ddmmyyyy, 0),
+        )
+        for day_str, ddmmyyyy in date_range
+    ]
