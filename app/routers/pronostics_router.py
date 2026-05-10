@@ -47,7 +47,9 @@ CHEVAUX_PAR_PARI = {
     "MULTI_5": 5,
     "MULTI_6": 6,
     "MULTI_7": 7,
+    "TRIO_ORDRE": 3,
     "TRIO": 3,
+    "SUPER4": 4,
 }
 
 # Labels lisibles
@@ -75,7 +77,9 @@ PARIS_LABELS = {
     "MULTI_5": "Multi en 5",
     "MULTI_6": "Multi en 6",
     "MULTI_7": "Multi en 7",
+    "TRIO_ORDRE": "Trio Ordre",
     "TRIO": "Trio",
+    "SUPER4": "Super4",
 }
 
 MODES = ["auto", "expert", "sans_cote"]
@@ -150,6 +154,12 @@ async def get_pronostics(
         for pari_key, pari_info in paris_data.items():
             if pari_key not in CHEVAUX_PAR_PARI:
                 continue
+
+            # SUPER4 : uniquement si nb_partants entre 5 et 9
+            if pari_key == "SUPER4":
+                nb_part = course.nombre_partants or 0
+                if not (5 <= nb_part <= 9):
+                    continue
 
             # Trouver le meilleur mode pour ce pari
             best_mode = None
