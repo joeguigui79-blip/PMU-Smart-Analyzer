@@ -100,7 +100,7 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "MULTI_7":          ["MULTI", "E_MULTI"],
     "TRIO_ORDRE":       ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
     "TRIO":             ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
-    "SUPER4":           ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "quarte", "QUARTE+"],
+    "SUPER4":           ["SUPER_QUATRE", "E_SUPER_QUATRE"],
 }
 
 MODES = ["auto", "expert", "sans_cote"]
@@ -453,12 +453,6 @@ async def get_bilan(
         for pari_key in PARIS_LABELS:
             if not _pari_in_disponibles(pari_key, course.paris_disponibles):
                 continue
-
-            # SUPER4 : uniquement si nb_partants entre 5 et 9
-            if pari_key == "SUPER4":
-                nb_part = course.nombre_partants or 0
-                if not (5 <= nb_part <= 9):
-                    continue
 
             # Pour chaque mode — trier TOUS les participants par score
             for mode in MODES:

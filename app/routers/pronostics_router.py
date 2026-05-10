@@ -155,12 +155,6 @@ async def get_pronostics(
             if pari_key not in CHEVAUX_PAR_PARI:
                 continue
 
-            # SUPER4 : uniquement si nb_partants entre 5 et 9
-            if pari_key == "SUPER4":
-                nb_part = course.nombre_partants or 0
-                if not (5 <= nb_part <= 9):
-                    continue
-
             # Trouver le meilleur mode pour ce pari
             best_mode = None
             best_taux = 0
