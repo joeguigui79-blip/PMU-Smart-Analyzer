@@ -35,6 +35,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import Course, Participant, Reunion
@@ -411,7 +412,13 @@ async def get_bilan(
     # else: all — pas de filtre
 
     # Récupérer les courses terminées avec filtre date + discipline
-    query = select(Course).join(Reunion).where(Course.statut_resultat == "TERMINE")
+    # selectinload évite le N+1 : tous les participants sont chargés en une seule requête IN
+    query = (
+        select(Course)
+        .join(Reunion)
+        .options(selectinload(Course.participants))
+        .where(Course.statut_resultat == "TERMINE")
+    )
     if date_from:
         query = query.where(Reunion.date_str >= date_from)
     if discipline and discipline != "all":
@@ -433,11 +440,8 @@ async def get_bilan(
     total_courses_with_results = 0
 
     for course in courses:
-        # Récupérer TOUS les participants de la course
-        p_result = await db.execute(
-            select(Participant).where(Participant.course_id == course.id)
-        )
-        all_participants = p_result.scalars().all()
+        # Les participants sont déjà chargés via selectinload — pas de requête supplémentaire
+        all_participants = course.participants
 
         # Vérifier qu'il y a des arrivées renseignées
         participants_with_pos = [p for p in all_participants if p.position_arrivee is not None]
@@ -449,20 +453,20 @@ async def get_bilan(
         # Construire le dict positions (seulement ceux avec position)
         positions = {p.num_pmu: p.position_arrivee for p in participants_with_pos}
 
+        # Pré-calculer le tri par mode UNE seule fois par course (3 tris au lieu de 3 × nb_paris)
+        sorted_by_mode = {
+            mode: sorted(all_participants, key=lambda p, m=mode: _score_for_mode(p, m), reverse=True)
+            for mode in MODES
+        }
+
         # Pour chaque type de pari disponible dans la course
         for pari_key in PARIS_LABELS:
             if not _pari_in_disponibles(pari_key, course.paris_disponibles):
                 continue
 
-            # Pour chaque mode — trier TOUS les participants par score
             for mode in MODES:
-                sorted_parts = sorted(
-                    all_participants,
-                    key=lambda p: _score_for_mode(p, mode),
-                    reverse=True,
-                )
                 stats[pari_key][mode]["evaluees"] += 1
-                if _simulate_pari(pari_key, sorted_parts, positions):
+                if _simulate_pari(pari_key, sorted_by_mode[mode], positions):
                     stats[pari_key][mode]["gagnes"] += 1
 
     # Construire la réponse finale
