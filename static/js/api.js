@@ -28,6 +28,10 @@ async function apiFetch(path, options) {
     options.headers = options.headers || {};
     options.headers["Authorization"] = "Bearer " + token;
   }
+  // Timeout via AbortController (15s)
+  var controller = new AbortController();
+  var timeoutId = setTimeout(function () { controller.abort(); }, 15000);
+  options.signal = controller.signal;
   try {
     const res = await fetch(BASE + path, options);
     if (res.status === 401) {
@@ -40,8 +44,15 @@ async function apiFetch(path, options) {
     if (!res.ok) throw new Error("HTTP " + res.status);
     return await res.json();
   } catch (e) {
+    if (e.name === "AbortError") {
+      var timeoutErr = new Error("Délai de connexion dépassé");
+      console.error("API error [" + path + "]:", timeoutErr);
+      throw timeoutErr;
+    }
     console.error("API error [" + path + "]:", e);
     throw e;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -50,7 +61,7 @@ const API = {
   dashboard:  function () { return cachedFetch("/api/dashboard"); },
   reunions:   function () { return cachedFetch("/api/reunions"); },
   course:     function (id) { return apiFetch("/api/courses/" + id); },
-  stats:      function () { return apiFetch("/api/stats"); },
+  stats:      function () { return cachedFetch("/api/stats"); },
   refresh:    function () { clearCache(); return apiFetch("/api/refresh", { method: "POST" }); },
 
   // ---- F3 : Suggestions combos ----
