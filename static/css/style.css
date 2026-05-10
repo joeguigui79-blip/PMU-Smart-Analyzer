@@ -581,8 +581,8 @@ body {
   bottom: 0;
   left: 0;
 }
-.stat-bar-fill.courses { background: var(--blue); opacity: 0.6; }
-.stat-bar-fill.vb { background: var(--green); opacity: 0.9; }
+.stat-bar-fill.courses { background: var(--green); opacity: 0.9; }
+.stat-bar-fill.vb { background: var(--gold); opacity: 0.9; }
 .stat-bar-label { font-size: 9px; color: var(--text-muted); white-space: nowrap; }
 .stats-chart-legend {
   margin: 4px 16px 8px;
@@ -598,8 +598,8 @@ body {
   border-radius: 2px;
   display: inline-block;
 }
-.legend-dot.courses { background: var(--blue); opacity: 0.6; }
-.legend-dot.vb { background: var(--green); }
+.legend-dot.courses { background: var(--green); opacity: 0.9; }
+.legend-dot.vb { background: var(--gold); }
 
 /* ---- Bet Button ---- */
 .participant-row-wrap { border-bottom: 1px solid var(--border); }
