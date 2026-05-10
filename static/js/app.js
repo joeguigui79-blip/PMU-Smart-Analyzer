@@ -1354,15 +1354,17 @@ window.doCalibrate = doCalibrate;
 
 var _bilanData = null;
 var _bilanPeriode = "all";
+var _bilanDiscipline = "all";
 
-async function loadBilanPage(periode) {
+async function loadBilanPage(periode, discipline) {
   if (periode !== undefined) _bilanPeriode = periode;
+  if (discipline !== undefined) _bilanDiscipline = discipline;
   var container = document.getElementById("bilan-content");
   if (!container) return;
   container.innerHTML = '<div class="stats-loading"><div class="spinner"></div><p>Calcul du bilan en cours\u2026</p></div>';
 
   try {
-    _bilanData = await API.bilan(_bilanPeriode);
+    _bilanData = await API.bilan(_bilanPeriode, _bilanDiscipline);
     container.innerHTML = renderBilanPage(_bilanData);
   } catch (e) {
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement du bilan.<br>' + (e.message || "") + "</div>";
@@ -1393,6 +1395,21 @@ function renderBilanPage(data) {
   for (var i = 0; i < periodes.length; i++) {
     var p = periodes[i];
     html += '<button class="scoring-toggle-btn' + (_bilanPeriode === p.key ? ' active' : '') + '" onclick="loadBilanPage(\'' + p.key + '\')">' + p.label + '</button>';
+  }
+  html += '</div>';
+
+  // Filtre discipline
+  var disciplines = [
+    {key: "all", label: "Tout"},
+    {key: "PLAT", label: "Plat"},
+    {key: "TROT_MONTE", label: "Mont\u00e9"},
+    {key: "TROT_ATTELE", label: "Attel\u00e9"},
+    {key: "HAIE", label: "Haie/Obstacle"}
+  ];
+  html += '<div class="scoring-toggle" style="margin-bottom:16px;">';
+  for (var i = 0; i < disciplines.length; i++) {
+    var d = disciplines[i];
+    html += '<button class="scoring-toggle-btn' + (_bilanDiscipline === d.key ? ' active' : '') + '" onclick="loadBilanPage(undefined, \'' + d.key + '\')">' + d.label + '</button>';
   }
   html += '</div>';
 

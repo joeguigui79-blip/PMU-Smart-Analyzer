@@ -68,7 +68,7 @@ const API = {
   calibrate:        function () { return apiFetch("/api/calibrate", { method: "POST" }); },
 
   // ---- Bilan backtesting ----
-  bilan: function (periode) { return apiFetch("/api/bilan?periode=" + (periode || "all")); },
+  bilan: function (periode, discipline) { return apiFetch("/api/bilan?periode=" + (periode || "all") + "&discipline=" + (discipline || "all")); },
   liveScores: function (courseId) { return apiFetch("/api/courses/" + courseId + "/live-scores"); },
   pronostics: function (courseId) { return apiFetch("/api/courses/" + courseId + "/pronostics"); },
 };

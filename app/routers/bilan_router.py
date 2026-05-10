@@ -364,11 +364,12 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
 @router.get("/api/bilan")
 async def get_bilan(
     periode: Optional[str] = Query(default="all", description="today|7days|30days|month|all"),
+    discipline: Optional[str] = Query(default="all", description="all|PLAT|TROT_MONTE|TROT_ATTELE|HAIE"),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Retourne le bilan de backtesting pour chaque type de pari et chaque mode de scoring.
-    Filtre par période : today, 7days, 30days, month, all.
+    Filtre par période et par discipline.
     """
     # Déterminer la date de début selon la période
     paris_tz = ZoneInfo("Europe/Paris")
@@ -385,10 +386,16 @@ async def get_bilan(
         date_from = now.replace(day=1).strftime("%d%m%Y")
     # else: all — pas de filtre
 
-    # Récupérer les courses terminées avec filtre date
+    # Récupérer les courses terminées avec filtre date + discipline
     query = select(Course).join(Reunion).where(Course.statut_resultat == "TERMINE")
     if date_from:
         query = query.where(Reunion.date_str >= date_from)
+    if discipline and discipline != "all":
+        # Regrouper HAIE/STEEPLE/CROSS sous "HAIE"
+        if discipline == "HAIE":
+            query = query.where(Course.discipline.in_(["HAIE", "STEEPLE", "CROSS", "OBSTACLE"]))
+        else:
+            query = query.where(Course.discipline == discipline)
     courses_result = await db.execute(query)
     courses = courses_result.scalars().all()
 
