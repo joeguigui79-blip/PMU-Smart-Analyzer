@@ -491,7 +491,7 @@ async def get_bilan(
     query = (
         select(Course)
         .join(Reunion)
-        .options(selectinload(Course.participants))
+        .options(selectinload(Course.participants), selectinload(Course.reunion))
         .where(Course.statut_resultat == "TERMINE")
     )
     courses_result = await db.execute(query)
