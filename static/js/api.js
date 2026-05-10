@@ -1,6 +1,25 @@
 /* API wrapper — PMU Smart Analyzer v2 */
 const BASE = "";
 
+// ---- Cache mémoire TTL 60s pour les GET ----
+var _cache = {};
+var _CACHE_TTL = 60000; // 60 secondes
+
+async function cachedFetch(path) {
+  var now = Date.now();
+  var entry = _cache[path];
+  if (entry && (now - entry.ts) < _CACHE_TTL) {
+    return entry.data;
+  }
+  var data = await apiFetch(path);
+  _cache[path] = { data: data, ts: Date.now() };
+  return data;
+}
+
+function clearCache() {
+  _cache = {};
+}
+
 async function apiFetch(path, options) {
   options = options || {};
   // Inject auth token into every request
@@ -28,11 +47,11 @@ async function apiFetch(path, options) {
 
 const API = {
   // ---- Existants ----
-  dashboard:  function () { return apiFetch("/api/dashboard"); },
-  reunions:   function () { return apiFetch("/api/reunions"); },
+  dashboard:  function () { return cachedFetch("/api/dashboard"); },
+  reunions:   function () { return cachedFetch("/api/reunions"); },
   course:     function (id) { return apiFetch("/api/courses/" + id); },
   stats:      function () { return apiFetch("/api/stats"); },
-  refresh:    function () { return apiFetch("/api/refresh", { method: "POST" }); },
+  refresh:    function () { clearCache(); return apiFetch("/api/refresh", { method: "POST" }); },
 
   // ---- F3 : Suggestions combos ----
   courseSuggestions: function (id) { return apiFetch("/api/courses/" + id + "/suggestions"); },
@@ -53,6 +72,7 @@ const API = {
     return apiFetch("/api/bets/" + id, { method: "DELETE" });
   },
   refreshResults: function () {
+    clearCache();
     return apiFetch("/api/bets/refresh-results", { method: "POST" });
   },
 
@@ -63,15 +83,15 @@ const API = {
   scoringOptimize: function () { return apiFetch("/api/scoring/optimize", { method: "POST" }); },
 
   // ---- Stats avancées + Calibration ----
-  statsScoring:     function () { return apiFetch("/api/stats/scoring"); },
-  statsCalibration: function () { return apiFetch("/api/stats/calibration"); },
+  statsScoring:     function () { return cachedFetch("/api/stats/scoring"); },
+  statsCalibration: function () { return cachedFetch("/api/stats/calibration"); },
   calibrate:        function () { return apiFetch("/api/calibrate", { method: "POST" }); },
 
   // ---- Bilan backtesting ----
-  bilan: function (periode, discipline) { return apiFetch("/api/bilan?periode=" + (periode || "all") + "&discipline=" + (discipline || "all")); },
+  bilan: function (periode, discipline) { return cachedFetch("/api/bilan?periode=" + (periode || "all") + "&discipline=" + (discipline || "all")); },
   liveScores: function (courseId) { return apiFetch("/api/courses/" + courseId + "/live-scores"); },
   pronostics: function (courseId) { return apiFetch("/api/courses/" + courseId + "/pronostics"); },
-  pronosticsPage: function (seuil) { return apiFetch("/api/pronostics?seuil=" + (seuil || 30)); },
+  pronosticsPage: function (seuil) { return cachedFetch("/api/pronostics?seuil=" + (seuil || 30)); },
 };
 
 window.API = API;

@@ -20,8 +20,6 @@ router = APIRouter(prefix="/api", tags=["courses"])
 @router.get("/reunions", response_model=list[ReunionSchema])
 async def list_reunions(db: AsyncSession = Depends(get_db)):
     """Liste toutes les réunions du jour avec leurs courses."""
-    await load_programme_today(db)
-    await refresh_programme_statuts(db)
     date_str = today_str()
     result = await db.execute(
         select(Reunion)
@@ -36,8 +34,6 @@ async def list_reunions(db: AsyncSession = Depends(get_db)):
 @router.get("/courses", response_model=list[CourseSchema])
 async def list_courses(db: AsyncSession = Depends(get_db)):
     """Liste toutes les courses du jour."""
-    await load_programme_today(db)
-    await refresh_programme_statuts(db)
     date_str = today_str()
     result = await db.execute(
         select(Course)
@@ -47,6 +43,14 @@ async def list_courses(db: AsyncSession = Depends(get_db)):
     )
     courses = result.scalars().all()
     return courses
+
+
+@router.post("/refresh-programme", status_code=200)
+async def refresh_programme_data(db: AsyncSession = Depends(get_db)):
+    """Charge le programme PMU du jour et met à jour les statuts."""
+    loaded = await load_programme_today(db)
+    await refresh_programme_statuts(db)
+    return {"success": True, "loaded": loaded, "date": today_str()}
 
 
 @router.get("/courses/{course_id}", response_model=CourseDetailSchema)
@@ -156,6 +160,7 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     loaded = await load_programme_today(db)
+    await refresh_programme_statuts(db)
     return {"success": True, "loaded": loaded, "date": date_str}
 
 

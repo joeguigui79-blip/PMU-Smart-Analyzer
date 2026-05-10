@@ -128,9 +128,6 @@ async function loadDashboard() {
   var dateLabel = now.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
   document.querySelectorAll(".date-badge").forEach(function (el) { el.textContent = dateLabel; });
 
-  // Récupérer les arrivées en arrière-plan au chargement
-  API.refreshResults().catch(function() {});
-
   try {
     const [data, stats, accuracy, discStats] = await Promise.all([
       API.dashboard(),
@@ -1006,6 +1003,7 @@ async function doRefresh() {
   _coursesLoaded = false;  // Forcer le rechargement des courses
   try {
     await API.refresh();
+    await API.refreshProgramme();
     // Récupérer aussi les arrivées des courses terminées
     try { await API.refreshResults(); } catch(e) { console.warn("Arrivées:", e); }
     showToast("Données + résultats mis à jour !");
