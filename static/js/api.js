@@ -28,9 +28,9 @@ async function apiFetch(path, options) {
     options.headers = options.headers || {};
     options.headers["Authorization"] = "Bearer " + token;
   }
-  // Timeout via AbortController (15s)
+  // Timeout via AbortController (45s — couvre les cold starts Render free tier ~30s)
   var controller = new AbortController();
-  var timeoutId = setTimeout(function () { controller.abort(); }, 15000);
+  var timeoutId = setTimeout(function () { controller.abort(); }, 45000);
   options.signal = controller.signal;
   try {
     const res = await fetch(BASE + path, options);

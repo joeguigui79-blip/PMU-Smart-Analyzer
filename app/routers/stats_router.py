@@ -39,7 +39,10 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
       - % top-5 (Expert et Auto)
     """
     # Rattraper les arrivées manquantes avant de calculer les stats
-    await refresh_programme_statuts(db)
+    try:
+        await refresh_programme_statuts(db)
+    except Exception as exc:
+        logger.warning("refresh_programme_statuts failed (non-blocking): %s", exc)
 
     courses_result = await db.execute(
         select(Course)
@@ -75,13 +78,13 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
         disc_stats[disc]["nb_courses"] += 1
 
         # Top pick Expert (score_global_expert le plus élevé)
-        best_expert = max(participants, key=lambda p: p.score_global_expert)
+        best_expert = max(participants, key=lambda p: p.score_global_expert or 0)
         # Top pick Auto (score_global_auto le plus élevé)
-        best_auto = max(participants, key=lambda p: p.score_global_auto)
+        best_auto = max(participants, key=lambda p: p.score_global_auto or 0)
 
         # Top-N experts : les N premiers selon score_global_expert
-        sorted_expert = sorted(participants, key=lambda p: p.score_global_expert, reverse=True)
-        sorted_auto   = sorted(participants, key=lambda p: p.score_global_auto,   reverse=True)
+        sorted_expert = sorted(participants, key=lambda p: p.score_global_expert or 0, reverse=True)
+        sorted_auto   = sorted(participants, key=lambda p: p.score_global_auto or 0,   reverse=True)
 
         real_top3 = {p.num_pmu for p in participants if p.position_arrivee and p.position_arrivee <= 3}
         real_top5 = {p.num_pmu for p in participants if p.position_arrivee and p.position_arrivee <= 5}
@@ -185,7 +188,7 @@ async def _compute_evolution(db: AsyncSession) -> dict:
         if not participants:
             continue
 
-        best = max(participants, key=lambda p: p.score_global)
+        best = max(participants, key=lambda p: p.score_global or 0)
         is_correct = best.position_arrivee == 1
 
         if window == "recent":

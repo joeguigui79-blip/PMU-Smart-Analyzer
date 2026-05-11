@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,13 +11,17 @@ from app.schemas import DashboardSchema, ReunionSchema, ParticipantSchema, Daily
 from app.service import load_programme_today
 from app.config import today_str
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
 
 @router.get("/dashboard", response_model=DashboardSchema)
 async def get_dashboard(db: AsyncSession = Depends(get_db)):
     """Résumé du jour : stats globales et top recommandations."""
-    await load_programme_today(db)
+    try:
+        await load_programme_today(db)
+    except Exception as exc:
+        logger.warning("load_programme_today failed (non-blocking): %s", exc)
     date_str = today_str()
 
     # Réunions avec courses
