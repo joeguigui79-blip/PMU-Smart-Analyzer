@@ -1124,6 +1124,8 @@ async function _pollResults() {
 function startAutoPolling() {
   if (_autoPollingInterval) clearInterval(_autoPollingInterval);
   _autoPollingInterval = setInterval(_pollResults, AUTO_POLL_INTERVAL_MS);
+  // Déclencher immédiatement au démarrage sans attendre le premier cycle de 2 min
+  setTimeout(_pollResults, 3000);
 }
 
 // ---- Init ----

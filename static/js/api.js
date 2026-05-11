@@ -20,6 +20,16 @@ function clearCache() {
   _cache = {};
 }
 
+function clearCacheForResults() {
+  var keysToDelete = Object.keys(_cache).filter(function(k) {
+    return k.startsWith("/api/reunions") ||
+           k.startsWith("/api/bilan") ||
+           k.startsWith("/api/dashboard") ||
+           k.startsWith("/api/stats");
+  });
+  keysToDelete.forEach(function(k) { delete _cache[k]; });
+}
+
 async function apiFetch(path, options) {
   options = options || {};
   // Inject auth token into every request
@@ -84,6 +94,7 @@ const API = {
     return apiFetch("/api/bets/" + id, { method: "DELETE" });
   },
   refreshResults: function () {
+    clearCacheForResults();
     return apiFetch("/api/bets/refresh-results", { method: "POST" });
   },
 
