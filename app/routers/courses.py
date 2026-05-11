@@ -10,7 +10,7 @@ from app.schemas import (
     CourseSuggestionsSchema,
 )
 import app.service as _svc
-from app.service import load_programme_today, load_participants_for_course, fetch_and_store_arrivee, refresh_programme_statuts, _get_db_weights_by_discipline, _get_auto_weights_by_discipline
+from app.service import load_programme_today, load_participants_for_course, fetch_and_store_arrivee, refresh_programme_statuts, recuperer_arrivees_manquantes, _get_db_weights_by_discipline, _get_auto_weights_by_discipline
 from app.scoring import calculer_scores
 from app.pmu_client import pmu_client
 from app.config import today_str
@@ -160,7 +160,8 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
         # Aucune donnée PMU — bypass cooldown et rafraîchir les statuts seulement
         _svc._last_refresh_time = 0
         await refresh_programme_statuts(db)
-        return {"success": False, "loaded": False, "date": date_str}
+        arrivees_recuperees = await recuperer_arrivees_manquantes(db)
+        return {"success": False, "loaded": False, "date": date_str, "arrivees_recuperees": arrivees_recuperees}
 
     # Récupérer les réunions existantes (mise à jour en place, pas de suppression)
     existing_reunions_result = await db.execute(
@@ -236,7 +237,11 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
     _svc._last_refresh_time = 0
     await refresh_programme_statuts(db)
 
-    return {"success": True, "loaded": True, "date": date_str}
+    # Passe supplémentaire : récupérer les arrivées des courses TERMINE sans positions
+    # (cas où le statut TERMINE a été enregistré avant que l'API PMU rende l'arrivée disponible)
+    arrivees_recuperees = await recuperer_arrivees_manquantes(db)
+
+    return {"success": True, "loaded": True, "date": date_str, "arrivees_recuperees": arrivees_recuperees}
 
 
 @router.get("/courses/{course_id}/live-scores")

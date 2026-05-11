@@ -505,3 +505,60 @@ async def trigger_arrivee_refresh(db: AsyncSession) -> int:
             logger.warning("Erreur arrivée course %d : %s", course.id, e)
 
     return updated
+
+
+async def recuperer_arrivees_manquantes(db: AsyncSession) -> int:
+    """
+    Passe dédiée (sans cooldown) : pour chaque course du jour avec statut_resultat=TERMINE
+    mais sans aucune position_arrivee, tente fetch_and_store_arrivee.
+    Appelée après le refresh programme pour rattraper les courses dont le statut a été
+    mis à TERMINE avant que l'API PMU ne rende les arrivées disponibles.
+    Retourne le nombre de courses dont les arrivées ont été récupérées.
+    """
+    date_str = today_str()
+
+    # Courses TERMINE sans positions d'arrivée
+    courses_result = await db.execute(
+        select(Course)
+        .join(Reunion)
+        .where(
+            Reunion.date_str == date_str,
+            Course.statut_resultat == "TERMINE",
+        )
+    )
+    courses = courses_result.scalars().all()
+
+    recovered = 0
+    for course in courses:
+        # Vérifier s'il manque des positions
+        p_check = await db.execute(
+            select(Participant).where(
+                Participant.course_id == course.id,
+                Participant.position_arrivee.isnot(None),
+            ).limit(1)
+        )
+        has_positions = p_check.scalar_one_or_none() is not None
+        if has_positions:
+            continue
+
+        # Course TERMINE sans positions → re-tenter
+        try:
+            got = await fetch_and_store_arrivee(db, course.id)
+            if got:
+                recovered += 1
+                logger.info(
+                    "recuperer_arrivees_manquantes : arrivée récupérée pour course %d (%s)",
+                    course.id, course.libelle,
+                )
+            else:
+                logger.debug(
+                    "recuperer_arrivees_manquantes : API pas encore dispo pour course %d (%s)",
+                    course.id, course.libelle,
+                )
+        except Exception as e:
+            logger.warning("Erreur recuperer_arrivees_manquantes course %d : %s", course.id, e)
+
+    if recovered:
+        logger.info("recuperer_arrivees_manquantes : %d arrivée(s) récupérée(s)", recovered)
+
+    return recovered
