@@ -84,7 +84,6 @@ const API = {
     return apiFetch("/api/bets/" + id, { method: "DELETE" });
   },
   refreshResults: function () {
-    clearCache();
     return apiFetch("/api/bets/refresh-results", { method: "POST" });
   },
 

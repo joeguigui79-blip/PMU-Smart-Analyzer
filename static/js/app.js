@@ -1097,6 +1097,35 @@ function initPullToRefresh() {
   }, { passive: true });
 }
 
+// ---- Auto-polling des résultats (toutes les 2 minutes) ----
+var _autoPollingInterval = null;
+var AUTO_POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+async function _pollResults() {
+  try {
+    var result = await API.refreshResults();
+    var updated = result && result.courses_updated ? result.courses_updated : 0;
+    if (updated > 0) {
+      // Invalider le cache des pages concernées
+      _invalidatePage("courses");
+      _invalidatePage("bilan");
+      _invalidatePage("dashboard");
+      // Recharger silencieusement la page active
+      if (currentPage === "courses") loadCourses();
+      else if (currentPage === "bilan") loadBilanPage();
+      else if (currentPage === "dashboard") loadDashboard();
+    }
+  } catch (e) {
+    // Polling silencieux : ignorer les erreurs réseau
+    console.warn("Auto-polling résultats:", e);
+  }
+}
+
+function startAutoPolling() {
+  if (_autoPollingInterval) clearInterval(_autoPollingInterval);
+  _autoPollingInterval = setInterval(_pollResults, AUTO_POLL_INTERVAL_MS);
+}
+
 // ---- Init ----
 window.onerror = function (msg, src, line, col, err) {
   console.error("JS Error:", msg, "at", src, line, col, err);
@@ -1148,6 +1177,7 @@ function _appInit() {
     document.querySelectorAll(".date-badge").forEach(function (el) { el.textContent = dateLabel; });
 
     initPullToRefresh();
+    startAutoPolling();
     navigate("dashboard");
   } catch (err) {
     console.error("Init error:", err);
