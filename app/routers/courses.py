@@ -145,9 +145,32 @@ async def get_course_suggestions(course_id: int, db: AsyncSession = Depends(get_
 async def refresh_programme(db: AsyncSession = Depends(get_db)):
     """Force le rechargement du programme depuis l'API PMU."""
     date_str = today_str()
-    result = await db.execute(
-        select(Reunion).where(Reunion.date_str == date_str)
+
+    # Sauvegarder les arrivées des courses TERMINE avant suppression
+    # pour éviter la perte des données du bilan du jour
+    termine_result = await db.execute(
+        select(Course)
+        .join(Reunion)
+        .where(
+            Reunion.date_str == date_str,
+            Course.statut_resultat == "TERMINE",
+        )
+        .options(selectinload(Course.participants))
     )
+    termine_courses = termine_result.scalars().all()
+    # Carte: num_externe -> {num_pmu: position_arrivee}
+    arrivee_backup: dict = {}
+    for c in termine_courses:
+        positions = {
+            p.num_pmu: p.position_arrivee
+            for p in c.participants
+            if p.position_arrivee is not None
+        }
+        if positions:
+            arrivee_backup[c.num_externe] = positions
+
+    # Supprimer toutes les réunions du jour (cascade vers courses + participants)
+    result = await db.execute(select(Reunion).where(Reunion.date_str == date_str))
     reunions = result.scalars().all()
     for r in reunions:
         await db.delete(r)
@@ -155,6 +178,28 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
 
     loaded = await load_programme_today(db)
     await refresh_programme_statuts(db)
+
+    # Restaurer les arrivées pour les courses qui étaient TERMINE avant le refresh
+    if arrivee_backup:
+        restored_result = await db.execute(
+            select(Course)
+            .join(Reunion)
+            .where(
+                Reunion.date_str == date_str,
+                Course.num_externe.in_(list(arrivee_backup.keys())),
+            )
+            .options(selectinload(Course.participants))
+        )
+        for course in restored_result.scalars().all():
+            positions = arrivee_backup.get(course.num_externe, {})
+            if not positions:
+                continue
+            for p in course.participants:
+                if p.num_pmu in positions:
+                    p.position_arrivee = positions[p.num_pmu]
+            course.statut_resultat = "TERMINE"
+        await db.commit()
+
     return {"success": True, "loaded": loaded, "date": date_str}
 
 

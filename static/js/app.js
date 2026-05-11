@@ -1037,26 +1037,40 @@ function closeModal() {
 }
 
 // ---- Refresh ----
+var _refreshing = false;
 async function doRefresh() {
+  if (_refreshing) return;
+  _refreshing = true;
+  // Mettre en pause le polling auto pour éviter les conflits DB concurrents
+  if (_autoPollingInterval) {
+    clearInterval(_autoPollingInterval);
+    _autoPollingInterval = null;
+  }
   showToast("Rechargement en cours...");
   // Invalider la page courante pour forcer rechargement
   _invalidatePage(currentPage);
   _coursesLoaded = false;
+  var refreshOk = false;
   try {
     await API.refresh();
-    await API.refreshProgramme();
-    // Récupérer aussi les arrivées des courses terminées
-    try { await API.refreshResults(); } catch(e) { console.warn("Arrivées:", e); }
-    showToast("Données + résultats mis à jour !");
-    if (currentPage === "dashboard") loadDashboard();
-    else if (currentPage === "courses") loadCourses();
-    else if (currentPage === "pronostics") loadPronosticsPage();
-    else if (currentPage === "stats") loadStatsPage();
-    else if (currentPage === "bilan") loadBilanPage();
-    else if (currentPage === "course" && _betModalCourse) showCourse(_betModalCourse.id);
-  } catch (e) {
-    showToast("Erreur lors du rechargement", true);
+    refreshOk = true;
+  } catch(e) {
+    console.error("Refresh programme:", e);
   }
+  try { await API.refreshProgramme(); } catch(e) { console.warn("Refresh statuts:", e); }
+  // Récupérer aussi les arrivées des courses terminées
+  try { await API.refreshResults(); } catch(e) { console.warn("Arrivées:", e); }
+  showToast(refreshOk ? "Données + résultats mis à jour !" : "Rechargement partiel — vérifiez la connexion");
+  // Toujours recharger la page courante même en cas d'erreur partielle
+  if (currentPage === "dashboard") loadDashboard();
+  else if (currentPage === "courses") loadCourses();
+  else if (currentPage === "pronostics") loadPronosticsPage();
+  else if (currentPage === "stats") loadStatsPage();
+  else if (currentPage === "bilan") loadBilanPage();
+  else if (currentPage === "course" && _betModalCourse) showCourse(_betModalCourse.id);
+  _refreshing = false;
+  // Reprendre le polling auto après le refresh
+  startAutoPolling();
 }
 
 // ---- Pull-to-Refresh ----
@@ -1104,6 +1118,7 @@ var _autoPollingInterval = null;
 var AUTO_POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 async function _pollResults() {
+  if (_refreshing) return; // Ne pas polluer pendant un refresh manuel
   try {
     var result = await API.refreshResults();
     var updated = result && result.courses_updated ? result.courses_updated : 0;
