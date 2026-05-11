@@ -9,6 +9,7 @@ from app.schemas import (
     CourseSchema, CourseDetailSchema, ReunionSchema, ParticipantSchema,
     CourseSuggestionsSchema,
 )
+import app.service as _svc
 from app.service import load_programme_today, load_participants_for_course, fetch_and_store_arrivee, refresh_programme_statuts, _get_db_weights_by_discipline, _get_auto_weights_by_discipline
 from app.scoring import calculer_scores
 from app.pmu_client import pmu_client
@@ -143,64 +144,99 @@ async def get_course_suggestions(course_id: int, db: AsyncSession = Depends(get_
 
 @router.post("/refresh", status_code=200)
 async def refresh_programme(db: AsyncSession = Depends(get_db)):
-    """Force le rechargement du programme depuis l'API PMU."""
+    """Force le rechargement du programme depuis l'API PMU (mise à jour non-destructive).
+
+    Au lieu de supprimer/recréer les réunions (ce qui détruit participants et arrivées),
+    on récupère le programme frais et on met à jour les champs en place.
+    Les participants et positions d'arrivée déjà en base sont préservés.
+    """
     date_str = today_str()
 
-    # Sauvegarder les arrivées des courses TERMINE avant suppression
-    # pour éviter la perte des données du bilan du jour
-    termine_result = await db.execute(
-        select(Course)
-        .join(Reunion)
-        .where(
-            Reunion.date_str == date_str,
-            Course.statut_resultat == "TERMINE",
-        )
-        .options(selectinload(Course.participants))
-    )
-    termine_courses = termine_result.scalars().all()
-    # Carte: num_externe -> {num_pmu: position_arrivee}
-    arrivee_backup: dict = {}
-    for c in termine_courses:
-        positions = {
-            p.num_pmu: p.position_arrivee
-            for p in c.participants
-            if p.position_arrivee is not None
-        }
-        if positions:
-            arrivee_backup[c.num_externe] = positions
+    # Récupérer le programme frais depuis l'API PMU
+    data = await pmu_client.get_programme(date_str)
+    reunions_data = data.get("reunions", [])
 
-    # Supprimer toutes les réunions du jour (cascade vers courses + participants)
-    result = await db.execute(select(Reunion).where(Reunion.date_str == date_str))
-    reunions = result.scalars().all()
-    for r in reunions:
-        await db.delete(r)
+    if not reunions_data:
+        # Aucune donnée PMU — bypass cooldown et rafraîchir les statuts seulement
+        _svc._last_refresh_time = 0
+        await refresh_programme_statuts(db)
+        return {"success": False, "loaded": False, "date": date_str}
+
+    # Récupérer les réunions existantes (mise à jour en place, pas de suppression)
+    existing_reunions_result = await db.execute(
+        select(Reunion).where(Reunion.date_str == date_str)
+    )
+    existing_reunions = {r.num_officiel: r for r in existing_reunions_result.scalars().all()}
+
+    new_items = 0
+    for r_data in reunions_data:
+        num_off = r_data["num_officiel"]
+        if num_off in existing_reunions:
+            reunion = existing_reunions[num_off]
+        else:
+            reunion = Reunion(
+                date_str=date_str,
+                num_officiel=r_data["num_officiel"],
+                num_externe=r_data["num_externe"],
+                hippodrome_code=r_data["hippodrome_code"],
+                hippodrome_libelle=r_data["hippodrome_libelle"],
+                pays=r_data["pays"],
+            )
+            db.add(reunion)
+            await db.flush()
+            new_items += 1
+
+        # Courses existantes pour cette réunion
+        existing_courses_result = await db.execute(
+            select(Course).where(Course.reunion_id == reunion.id)
+        )
+        existing_courses = {c.num_externe: c for c in existing_courses_result.scalars().all()}
+
+        for c_data in r_data.get("courses", []):
+            statut_pmu = c_data.get("statut", "")
+            num_ext = c_data["num_externe"]
+
+            if num_ext in existing_courses:
+                course = existing_courses[num_ext]
+                # Mettre à jour le statut PMU brut
+                course.statut = statut_pmu
+                # Ne jamais régresser de TERMINE à EN_COURS (préserver les arrivées)
+                if statut_pmu in _svc.STATUTS_TERMINES and course.statut_resultat != "TERMINE":
+                    course.statut_resultat = "TERMINE"
+                # Mettre à jour le nombre de partants si changé
+                course.nombre_partants = c_data["nombre_partants"]
+            else:
+                statut_resultat = "TERMINE" if statut_pmu in _svc.STATUTS_TERMINES else "EN_COURS"
+                course = Course(
+                    reunion_id=reunion.id,
+                    num_ordre=c_data["num_ordre"],
+                    num_externe=c_data["num_externe"],
+                    libelle=c_data["libelle"],
+                    libelle_court=c_data["libelle_court"],
+                    heure_depart=c_data["heure_depart"],
+                    distance=c_data["distance"],
+                    discipline=c_data["discipline"],
+                    specialite=c_data["specialite"],
+                    terrain=c_data["terrain"],
+                    penetrometre_valeur=c_data["penetrometre_valeur"],
+                    nombre_partants=c_data["nombre_partants"],
+                    montant_prix=c_data["montant_prix"],
+                    statut=statut_pmu,
+                    condition_age=c_data["condition_age"],
+                    condition_sexe=c_data["condition_sexe"],
+                    paris_disponibles=",".join(c_data.get("paris_disponibles", [])),
+                    statut_resultat=statut_resultat,
+                )
+                db.add(course)
+                new_items += 1
+
     await db.commit()
 
-    loaded = await load_programme_today(db)
+    # Bypass du cooldown pour forcer le refresh des statuts et des arrivées manquantes
+    _svc._last_refresh_time = 0
     await refresh_programme_statuts(db)
 
-    # Restaurer les arrivées pour les courses qui étaient TERMINE avant le refresh
-    if arrivee_backup:
-        restored_result = await db.execute(
-            select(Course)
-            .join(Reunion)
-            .where(
-                Reunion.date_str == date_str,
-                Course.num_externe.in_(list(arrivee_backup.keys())),
-            )
-            .options(selectinload(Course.participants))
-        )
-        for course in restored_result.scalars().all():
-            positions = arrivee_backup.get(course.num_externe, {})
-            if not positions:
-                continue
-            for p in course.participants:
-                if p.num_pmu in positions:
-                    p.position_arrivee = positions[p.num_pmu]
-            course.statut_resultat = "TERMINE"
-        await db.commit()
-
-    return {"success": True, "loaded": loaded, "date": date_str}
+    return {"success": True, "loaded": True, "date": date_str}
 
 
 @router.get("/courses/{course_id}/live-scores")
