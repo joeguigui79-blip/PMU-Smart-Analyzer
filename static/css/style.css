@@ -67,6 +67,7 @@ body {
   letter-spacing: -0.5px;
 }
 .top-header .logo span { color: var(--text); font-weight: 400; }
+.top-header .logo-byline { font-size: 10px; font-weight: 400; color: var(--text-muted); letter-spacing: 0.3px; margin-top: -2px; }
 .top-header .date-badge {
   margin-left: auto;
   font-size: 12px;
