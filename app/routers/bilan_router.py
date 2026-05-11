@@ -134,6 +134,16 @@ def _week_key_from_date_str(date_str: str) -> Optional[str]:
     return f"{iso_year}-S{iso_week:02d}"
 
 
+def _ddmmyyyy_to_iso(date_str: str) -> Optional[str]:
+    """Convertit DDMMYYYY en YYYYMMDD pour comparaison lexicographique correcte."""
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, "%d%m%Y").strftime("%Y%m%d")
+    except ValueError:
+        return None
+
+
 def _init_stats(pari_keys: list[str]) -> dict[str, dict[str, dict[str, int]]]:
     return {
         pari_key: {
@@ -189,13 +199,13 @@ def _serialize_stats(stats: dict[str, dict[str, dict[str, int]]], labels: dict[s
 def _score_for_mode(p: Participant, mode: str) -> float:
     """Retourne le score du participant selon le mode, avec fallback."""
     if mode == "auto":
-        # fallback: score_global_expert si auto est 0
-        return p.score_global_auto if p.score_global_auto != 0.0 else p.score_global_expert
+        v = p.score_global_auto or 0.0
+        return v if v != 0.0 else (p.score_global_expert or 0.0)
     elif mode == "expert":
-        # fallback: score_global si expert est 0
-        return p.score_global_expert if p.score_global_expert != 0.0 else p.score_global
+        v = p.score_global_expert or 0.0
+        return v if v != 0.0 else (p.score_global or 0.0)
     else:  # sans_cote
-        return p.score_sans_cote
+        return p.score_sans_cote or 0.0
 
 
 def _pari_in_disponibles(pari_key: str, paris_disponibles_str: str) -> bool:
@@ -501,9 +511,13 @@ async def get_bilan(
     evolution_stats: dict[str, dict[str, dict[str, dict[str, int]]]] = {}
     total_courses_with_results = 0
 
+    # Convertir date_from en ISO pour comparaison correcte inter-mois
+    date_from_iso = _ddmmyyyy_to_iso(date_from) if date_from else None
+
     for course in courses:
         course_date_str = course.reunion.date_str if course.reunion else None
-        matches_period = not date_from or (course_date_str and course_date_str >= date_from)
+        course_date_iso = _ddmmyyyy_to_iso(course_date_str) if course_date_str else None
+        matches_period = not date_from_iso or (course_date_iso and course_date_iso >= date_from_iso)
         matches_discipline = _is_discipline_match(course.discipline, discipline)
 
         if matches_period and matches_discipline:

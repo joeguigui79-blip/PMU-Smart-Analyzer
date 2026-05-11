@@ -72,7 +72,7 @@ async def get_course(course_id: int, db: AsyncSession = Depends(get_db)):
         await fetch_and_store_arrivee(db, course.id)
         await db.refresh(course, attribute_names=["participants"])
 
-    participants = sorted(course.participants, key=lambda p: p.score_global, reverse=True)
+    participants = sorted(course.participants, key=lambda p: p.score_global or 0, reverse=True)
     value_bets = [p for p in participants if p.is_value_bet]
     top_pick = participants[0] if participants else None
 

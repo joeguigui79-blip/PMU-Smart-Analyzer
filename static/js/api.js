@@ -62,7 +62,8 @@ const API = {
   reunions:   function () { return cachedFetch("/api/reunions"); },
   course:     function (id) { return apiFetch("/api/courses/" + id); },
   stats:      function () { return cachedFetch("/api/stats"); },
-  refresh:    function () { clearCache(); return apiFetch("/api/refresh", { method: "POST" }); },
+  refresh:          function () { clearCache(); return apiFetch("/api/refresh", { method: "POST" }); },
+  refreshProgramme: function () { return apiFetch("/api/refresh-programme", { method: "POST" }); },
 
   // ---- F3 : Suggestions combos ----
   courseSuggestions: function (id) { return apiFetch("/api/courses/" + id + "/suggestions"); },

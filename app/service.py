@@ -428,7 +428,10 @@ async def evaluer_paris_pour_course(db: AsyncSession, course_id: int) -> None:
         except (json.JSONDecodeError, TypeError):
             chevaux = []
 
-        numeros = [int(c.get("numero", 0)) for c in chevaux]
+        try:
+            numeros = [int(c.get("numero", 0)) for c in chevaux if c.get("numero") is not None]
+        except (ValueError, TypeError):
+            numeros = []
         positions = []
         for num in numeros:
             p = participants.get(num)
