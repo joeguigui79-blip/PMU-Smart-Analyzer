@@ -28,7 +28,7 @@
   --nav-height: 64px;
 }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overscroll-behavior-y: none; }
 
 body {
   background: var(--bg);
@@ -39,6 +39,7 @@ body {
   min-height: 100dvh;
   padding-bottom: var(--nav-height);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
 }
 
 /* ---- Layout ---- */

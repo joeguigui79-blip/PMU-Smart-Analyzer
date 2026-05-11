@@ -7,7 +7,7 @@
      - Page offline.html pré-cachée pour les navigations sans réseau
    ============================================= */
 
-const CACHE_STATIC_V  = "pmu-static-v8";
+const CACHE_STATIC_V  = "pmu-static-v9";
 const CACHE_API_V     = "pmu-api-v6";
 
 const STATIC_ASSETS = [

@@ -1053,6 +1053,7 @@ async function doRefresh() {
     else if (currentPage === "pronostics") loadPronosticsPage();
     else if (currentPage === "stats") loadStatsPage();
     else if (currentPage === "bilan") loadBilanPage();
+    else if (currentPage === "course" && _betModalCourse) showCourse(_betModalCourse.id);
   } catch (e) {
     showToast("Erreur lors du rechargement", true);
   }
@@ -1067,6 +1068,7 @@ function initPullToRefresh() {
   const indicator = document.getElementById("ptr-indicator");
 
   app.addEventListener("touchstart", function (e) {
+    pulling = false;
     if (window.scrollY === 0) {
       startY = e.touches[0].clientY;
       pulling = true;
