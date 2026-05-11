@@ -1270,21 +1270,44 @@ function renderStatsPage(scoringData, calibData) {
   // ── Header ──────────────────────────────────────────────────────────────────
   html += '<div class="stats-header">';
   html += '<h2 class="stats-title">Stats avancées — Scoring</h2>';
-  html += '<p class="stats-subtitle">Expert (poids manuels) vs Auto-calibré (historique)</p>';
+  html += '<p class="stats-subtitle">Expert (poids manuels) vs Auto-calibré (historique) vs Sans cote</p>';
   html += '<button class="btn-calibrate" onclick="doCalibrate()">Recalibrer maintenant</button>';
   html += "</div>";
 
   var discs = (scoringData && scoringData.disciplines) ? scoringData.disciplines : {};
   var calDiscs = (calibData && calibData.disciplines) ? calibData.disciplines : {};
   var totalCourses = (scoringData && scoringData.total_courses) || 0;
+  var summary = (scoringData && scoringData.discipline_summary) ? scoringData.discipline_summary : [];
+
+  // ── Résumé modes recommandés par discipline ───────────────────────────────
+  if (summary.length > 0) {
+    html += '<div class="stats-section stats-section-recommande">';
+    html += '<h3 class="stats-section-title">Mode recommandé par discipline</h3>';
+    html += '<div class="recommande-row">';
+    summary.forEach(function (s) {
+      var modeLabel = s.mode_recommande === "auto" ? "Auto" : s.mode_recommande === "sans_cote" ? "Sans cote" : "Expert";
+      var modeCls   = s.mode_recommande === "auto" ? "mode-auto" : s.mode_recommande === "sans_cote" ? "mode-sans-cote" : "mode-expert";
+      var taux = s.mode_recommande === "auto" ? s.taux_auto : s.mode_recommande === "sans_cote" ? s.taux_sans_cote : s.taux_expert;
+      html += '<div class="recommande-card">';
+      html += '<div class="rec-disc">' + s.discipline + '</div>';
+      html += '<div class="rec-mode ' + modeCls + '">' + modeLabel + '</div>';
+      html += '<div class="rec-taux">' + _rateBadge(taux) + '</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  }
 
   // ── Résumé global ────────────────────────────────────────────────────────────
   html += '<div class="stats-summary-row">';
   html += '<div class="stats-summary-card"><div class="ssc-value">' + totalCourses + '</div><div class="ssc-label">Courses analysées</div></div>';
 
-  var modeActif = calibData && calibData.calibrated ? "Auto" : "Expert";
-  var modeClass = calibData && calibData.calibrated ? "mode-auto" : "mode-expert";
-  html += '<div class="stats-summary-card"><div class="ssc-value ' + modeClass + '">' + modeActif + '</div><div class="ssc-label">Mode actif global</div></div>';
+  // Mode actif global = mode le plus souvent recommandé parmi les disciplines
+  var modeCounters = { expert: 0, auto: 0, sans_cote: 0 };
+  summary.forEach(function (s) { if (modeCounters[s.mode_recommande] !== undefined) modeCounters[s.mode_recommande]++; });
+  var globalBestMode = Object.keys(modeCounters).reduce(function (a, b) { return modeCounters[a] >= modeCounters[b] ? a : b; }, "expert");
+  var modeActifLabel = globalBestMode === "auto" ? "Auto" : globalBestMode === "sans_cote" ? "Sans cote" : "Expert";
+  var modeActifCls   = globalBestMode === "auto" ? "mode-auto" : globalBestMode === "sans_cote" ? "mode-sans-cote" : "mode-expert";
+  html += '<div class="stats-summary-card"><div class="ssc-value ' + modeActifCls + '">' + modeActifLabel + '</div><div class="ssc-label">Mode actif global</div></div>';
 
   if (calibData && calibData.last_updated_global) {
     var dt = new Date(calibData.last_updated_global);
@@ -1312,20 +1335,22 @@ function renderStatsPage(scoringData, calibData) {
     html += "</div></div>";
   }
 
-  // ── Taux de réussite par discipline ──────────────────────────────────────────
+  // ── Taux de réussite Top-1 par discipline ─────────────────────────────────
   html += '<div class="stats-section">';
-  html += '<h3 class="stats-section-title">Taux de réussite par discipline</h3>';
+  html += '<h3 class="stats-section-title">Taux Top-1 par discipline</h3>';
 
   var discKeys = Object.keys(discs);
   if (discKeys.length === 0) {
     html += '<p class="stats-empty">Pas encore de courses terminées.</p>';
   } else {
     discKeys.forEach(function (disc) {
-      var d = discs[disc];
+      var d    = discs[disc];
       var calD = calDiscs[disc] || {};
-      var modeBadge = calD.active_mode === "auto"
-        ? '<span class="mode-badge mode-auto">Auto</span>'
-        : '<span class="mode-badge mode-expert">Expert</span>';
+      // Mode recommandé depuis les données scoring (taux réels) — fallback active_mode calibration
+      var modeRec = d.mode_recommande || calD.active_mode || "expert";
+      var modeBadgeLabel = modeRec === "auto" ? "Auto" : modeRec === "sans_cote" ? "Sans cote" : "Expert";
+      var modeBadgeCls   = modeRec === "auto" ? "mode-auto" : modeRec === "sans_cote" ? "mode-sans-cote" : "mode-expert";
+      var modeBadge = '<span class="mode-badge ' + modeBadgeCls + '">' + modeBadgeLabel + '</span>';
 
       html += '<div class="disc-card">';
       html += '<div class="disc-card-header">';
@@ -1335,18 +1360,26 @@ function renderStatsPage(scoringData, calibData) {
       html += "</div>";
 
       if (!d.has_auto_data) {
-        var min = (scoringData.min_courses_required || 10);
-        html += '<div class="disc-progress-msg">Calibration auto disponible après ' + min + ' courses. ';
-        html += _progressBar(d.nb_courses, min);
+        var minC = (scoringData.min_courses_required || 10);
+        html += '<div class="disc-progress-msg">Calibration auto disponible après ' + minC + ' courses. ';
+        html += _progressBar(d.nb_courses, minC);
         html += "</div>";
       }
 
-      // Tableau comparatif Expert vs Auto
+      // Tableau Top-1 — 3 modes, meilleur surligné
+      var expertRate    = d.expert    ? d.expert.top1_rate    : 0;
+      var autoRate      = d.auto      ? d.auto.top1_rate      : 0;
+      var sansCoteRate  = d.sans_cote ? d.sans_cote.top1_rate : 0;
+      var bestRate      = Math.max(expertRate, autoRate, sansCoteRate);
+
+      function _cell(rate) {
+        var highlight = (rate === bestRate && bestRate > 0) ? ' class="best-cell"' : '';
+        return '<td' + highlight + '>' + _rateBadge(rate) + '</td>';
+      }
+
       html += '<table class="stats-table">';
-      html += "<thead><tr><th>Critère</th><th>Expert</th><th>Auto</th></tr></thead><tbody>";
-      html += "<tr><td>Top-1 exact</td><td>" + _rateBadge(d.expert.top1_rate) + "</td><td>" + _rateBadge(d.auto.top1_rate) + "</td></tr>";
-      html += "<tr><td>Top-3 prédits</td><td>" + _rateBadge(d.expert.top3_rate) + "</td><td>" + _rateBadge(d.auto.top3_rate) + "</td></tr>";
-      html += "<tr><td>Top-5 prédits</td><td>" + _rateBadge(d.expert.top5_rate) + "</td><td>" + _rateBadge(d.auto.top5_rate) + "</td></tr>";
+      html += "<thead><tr><th>Critère</th><th>Expert</th><th>Auto</th><th>Sans cote</th></tr></thead><tbody>";
+      html += "<tr><td>Top-1 exact</td>" + _cell(expertRate) + _cell(autoRate) + _cell(sansCoteRate) + "</tr>";
       html += "</tbody></table>";
       html += "</div>"; // disc-card
     });

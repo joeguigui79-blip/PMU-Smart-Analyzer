@@ -973,8 +973,9 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-.mode-auto   { color: var(--green) !important; }
-.mode-expert { color: var(--gold) !important; }
+.mode-auto      { color: var(--green) !important; }
+.mode-expert    { color: var(--gold) !important; }
+.mode-sans-cote { color: var(--blue) !important; }
 
 /* Sections */
 .stats-section {
@@ -1071,8 +1072,30 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-.mode-badge.mode-auto   { background: var(--green-dim); color: var(--green); }
-.mode-badge.mode-expert { background: var(--gold-dim);  color: var(--gold); }
+.mode-badge.mode-auto       { background: var(--green-dim); color: var(--green); }
+.mode-badge.mode-expert     { background: var(--gold-dim);  color: var(--gold); }
+.mode-badge.mode-sans-cote  { background: var(--blue-dim);  color: var(--blue); }
+
+/* Cellule meilleure performance dans stats-table */
+td.best-cell { background: rgba(34, 197, 94, 0.10); font-weight: 700; border-radius: 4px; }
+
+/* Résumé mode recommandé par discipline */
+.stats-section-recommande { background: var(--bg2); border-radius: 10px; padding: 12px 14px; }
+.recommande-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.recommande-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 90px;
+}
+.rec-disc  { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.rec-mode  { font-size: 13px; font-weight: 700; }
+.rec-taux  { font-size: 12px; }
 
 /* Progress bar (calibration progress) */
 .disc-progress-msg {
