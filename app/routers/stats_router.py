@@ -30,6 +30,7 @@ router = APIRouter(tags=["stats"])
 async def _get_top1_rates_by_disc(db: AsyncSession) -> dict[str, dict]:
     """
     Calcule le taux top-1 des 3 modes (expert, auto, sans_cote) par discipline.
+    Logique identique à bilan_router._score_for_mode + _simulate_pari("GAGNANT").
     Retourne :
       { disc: { expert: float, auto: float, sans_cote: float,
                 mode_recommande: str, nb_courses: int } }
@@ -44,22 +45,37 @@ async def _get_top1_rates_by_disc(db: AsyncSession) -> dict[str, dict]:
     raw: dict[str, dict] = {}
     for course in courses:
         disc = _normalize_discipline(course.discipline)
-        participants = [p for p in course.participants if p.position_arrivee is not None]
-        if len(participants) < 2:
+        all_participants = course.participants
+        participants_with_pos = [p for p in all_participants if p.position_arrivee is not None]
+        if len(participants_with_pos) < 2:
             continue
         if disc not in raw:
             raw[disc] = {"nb": 0, "expert": 0, "auto": 0, "sans_cote": 0}
         raw[disc]["nb"] += 1
 
-        best_expert   = max(participants, key=lambda p: p.score_global_expert or 0)
-        best_auto     = max(participants, key=lambda p: p.score_global_auto   or 0)
-        best_sans     = max(participants, key=lambda p: p.score_global         or 0)
+        positions = {p.num_pmu: p.position_arrivee for p in participants_with_pos}
 
-        if best_expert.position_arrivee == 1:
+        # Trier TOUS les participants par score (fallbacks identiques à bilan_router)
+        def _score_expert(p) -> float:
+            v = p.score_global_expert or 0.0
+            return v if v != 0.0 else (p.score_global or 0.0)
+
+        def _score_auto(p) -> float:
+            v = p.score_global_auto or 0.0
+            return v if v != 0.0 else (p.score_global_expert or 0.0)
+
+        def _score_sans_cote(p) -> float:
+            return p.score_sans_cote or 0.0
+
+        best_expert   = max(all_participants, key=_score_expert)
+        best_auto     = max(all_participants, key=_score_auto)
+        best_sans     = max(all_participants, key=_score_sans_cote)
+
+        if positions.get(best_expert.num_pmu) == 1:
             raw[disc]["expert"]    += 1
-        if best_auto.position_arrivee == 1:
+        if positions.get(best_auto.num_pmu) == 1:
             raw[disc]["auto"]      += 1
-        if best_sans.position_arrivee == 1:
+        if positions.get(best_sans.num_pmu) == 1:
             raw[disc]["sans_cote"] += 1
 
     result: dict[str, dict] = {}

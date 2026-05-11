@@ -162,17 +162,16 @@ async function loadDashboard() {
   document.querySelectorAll(".date-badge").forEach(function (el) { el.textContent = dateLabel; });
 
   try {
-    const [data, stats, accuracy, discStats] = await Promise.all([
+    const [data, stats, accuracy] = await Promise.all([
       API.dashboard(),
       API.stats().catch(function () { return null; }),
       API.scoringAccuracy().catch(function () { return null; }),
-      API.scoringDisciplineStats().catch(function () { return null; }),
     ]);
     if (data && data.offline) {
       content.innerHTML = "<div class='empty-state'><div class='empty-icon'>📵</div><div class='empty-title'>Hors ligne</div><p style='color:var(--text-muted);font-size:13px'>Reconnectez-vous pour voir les données du jour.</p></div>";
       return;
     }
-    renderDashboard(data, stats, accuracy, discStats);
+    renderDashboard(data, stats, accuracy);
     _markPageLoaded("dashboard");
   } catch (e) {
     console.error("Dashboard error:", e);
@@ -181,7 +180,7 @@ async function loadDashboard() {
   }
 }
 
-function renderDashboard(data, stats, accuracy, discStats) {
+function renderDashboard(data, stats, accuracy) {
   const content = document.getElementById("dashboard-content");
 
   const dateStr = data.date;
@@ -199,11 +198,6 @@ function renderDashboard(data, stats, accuracy, discStats) {
   // F2 : Précision du modèle globale
   if (accuracy && accuracy.length) {
     html += renderAccuracyCard(accuracy);
-  }
-
-  // Précision par discipline
-  if (discStats && discStats.disciplines && Object.keys(discStats.disciplines).length > 0) {
-    html += renderDisciplineStatsCard(discStats);
   }
 
   if (stats && stats.length) {
@@ -257,51 +251,6 @@ function renderDashboard(data, stats, accuracy, discStats) {
   }
 
   content.innerHTML = html;
-}
-
-// ---- Card précision par discipline ----
-function renderDisciplineStatsCard(discStats) {
-  var discs = discStats.disciplines || {};
-  var keys = Object.keys(discs);
-  if (!keys.length) return "";
-
-  var DISC_LABELS = {
-    "PLAT": "Plat",
-    "TROT_ATTELE": "Trot Attelé",
-    "TROT_MONTE": "Trot Monté",
-    "HAIE": "Haies",
-    "STEEPLE": "Steeple",
-    "CROSS": "Cross",
-  };
-
-  var html = "<div class='accuracy-card'>" +
-    "<div class='accuracy-title'>Précision par Discipline</div>";
-
-  keys.forEach(function(disc) {
-    var s = discs[disc];
-    if (!s || s.nb_courses === 0) return;
-    var label = DISC_LABELS[disc] || disc;
-    var winRate = s.top_pick_win_rate || 0;
-    var top3Rate = s.top_pick_top3_rate || 0;
-    var cls = winRate >= 30 ? "high" : winRate >= 15 ? "medium" : "low";
-
-    html += "<div style='margin-top:8px'>" +
-      "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:3px'>" +
-      "<span style='font-size:12px;font-weight:600'>" + label + "</span>" +
-      "<span style='font-size:11px;color:var(--text-muted)'>" + s.nb_courses + " courses</span>" +
-      "</div>" +
-      "<div style='display:flex;gap:12px;font-size:11px'>" +
-      "<span>Victoire top pick : <strong class='score-label " + cls + "'>" + winRate + "%</strong></span>" +
-      "<span>Top 3 : <strong>" + top3Rate + "%</strong></span>" +
-      "</div>" +
-      "<div class='score-bar' style='height:4px;margin-top:4px'>" +
-      "<div class='score-bar-fill " + cls + "' style='width:" + Math.min(winRate * 2, 100) + "%'></div>" +
-      "</div>" +
-      "</div>";
-  });
-
-  html += "</div>";
-  return html;
 }
 
 // ---- F2 : Card précision modèle ----
