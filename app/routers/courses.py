@@ -201,13 +201,15 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
                 course = existing_courses[num_ext]
                 # Mettre à jour le statut PMU brut
                 course.statut = statut_pmu
-                # Ne jamais régresser de TERMINE à EN_COURS (préserver les arrivées)
-                if statut_pmu in _svc.STATUTS_TERMINES and course.statut_resultat != "TERMINE":
-                    course.statut_resultat = "TERMINE"
+                # NE PAS forcer TERMINE ici : le statut PMU des courses étrangères
+                # (R5/R6 internationales) n'est pas fiable. refresh_programme_statuts,
+                # appelé juste après, vérifie les arrivées réelles avant de passer
+                # une course à TERMINE.
                 # Mettre à jour le nombre de partants si changé
                 course.nombre_partants = c_data["nombre_partants"]
             else:
-                statut_resultat = "TERMINE" if statut_pmu in _svc.STATUTS_TERMINES else "EN_COURS"
+                # Toujours créer en EN_COURS : refresh_programme_statuts se chargera
+                # de passer la course à TERMINE si elle a des arrivées vérifiées.
                 course = Course(
                     reunion_id=reunion.id,
                     num_ordre=c_data["num_ordre"],
@@ -226,7 +228,7 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
                     condition_age=c_data["condition_age"],
                     condition_sexe=c_data["condition_sexe"],
                     paris_disponibles=",".join(c_data.get("paris_disponibles", [])),
-                    statut_resultat=statut_resultat,
+                    statut_resultat="EN_COURS",
                 )
                 db.add(course)
                 new_items += 1
