@@ -165,7 +165,7 @@ async function loadDashboard() {
     const [data, stats, accuracy] = await Promise.all([
       API.dashboard(),
       API.stats().catch(function () { return null; }),
-      API.scoringAccuracy().catch(function () { return null; }),
+      API.scoringAccuracyByDiscipline().catch(function () { return null; }),
     ]);
     if (data && data.offline) {
       content.innerHTML = "<div class='empty-state'><div class='empty-icon'>📵</div><div class='empty-title'>Hors ligne</div><p style='color:var(--text-muted);font-size:13px'>Reconnectez-vous pour voir les données du jour.</p></div>";
@@ -255,36 +255,42 @@ function renderDashboard(data, stats, accuracy) {
 
 // ---- F2 : Card précision modèle ----
 function renderAccuracyCard(accuracy) {
-  const topPick = accuracy.find(function (a) { return a.critere === "forme_recente"; });
-  const total_samples = accuracy.reduce(function (s, a) { return s + (a.nb_samples || 0); }, 0);
+  // accuracy vient de /api/scoring/accuracy-by-discipline
+  // Format: [{discipline, critere, poids, precision, nb_samples}, ...]
 
-  let bestPrecision = 0;
-  let bestLabel = "—";
+  // Grouper par discipline
+  var byDisc = {};
   accuracy.forEach(function (a) {
-    if (a.nb_samples > 0 && a.precision > bestPrecision) {
-      bestPrecision = a.precision;
-      bestLabel = a.critere.replace(/_/g, " ");
-    }
+    if (!byDisc[a.discipline]) byDisc[a.discipline] = [];
+    byDisc[a.discipline].push(a);
   });
 
-  if (total_samples === 0) {
-    return "<div class='accuracy-card'><div class='accuracy-title'>Précision modèle</div>" +
-      "<div style='font-size:12px;color:var(--text-muted)'>Pas encore de données — placez des paris pour calibrer le modèle</div></div>";
+  // Par discipline : précision moyenne + nb_samples d'un seul critère représentatif
+  var discStats = [];
+  Object.keys(byDisc).sort().forEach(function (disc) {
+    var rows = byDisc[disc];
+    var active = rows.filter(function (r) { return r.nb_samples > 0; });
+    if (active.length === 0) return; // ignorer disciplines sans données
+    var avgPrecision = active.reduce(function (s, r) { return s + r.precision; }, 0) / active.length;
+    var rep = active.find(function (r) { return r.critere === "forme_recente"; }) || active[0];
+    discStats.push({ disc: disc, precision: avgPrecision, nb_samples: rep.nb_samples });
+  });
+
+  if (discStats.length === 0) {
+    return "<div class='accuracy-card'><div class='accuracy-title'>Précision modèle IA</div>" +
+      "<div style='font-size:12px;color:var(--text-muted)'>Pas encore de données — lancez l'optimisation pour calibrer le modèle</div></div>";
   }
 
-  const avgPrecision = accuracy.filter(function (a) { return a.nb_samples > 0; })
-    .reduce(function (s, a) { return s + a.precision; }, 0) /
-    accuracy.filter(function (a) { return a.nb_samples > 0; }).length;
-
-  return "<div class='accuracy-card'>" +
-    "<div class='accuracy-title'>Précision modèle IA</div>" +
-    "<div class='accuracy-row'>" +
-    "<span class='accuracy-label'>Top Pick</span>" +
-    "<span class='accuracy-pct'>" + Math.round(avgPrecision * 100) + "%</span>" +
-    "<span style='font-size:11px;color:var(--text-muted)'>sur " + total_samples + " courses</span>" +
-    "</div>" +
-    "<div style='font-size:11px;color:var(--text-muted);margin-top:4px'>Meilleur critère : " + bestLabel + " (" + Math.round(bestPrecision * 100) + "%)</div>" +
-    "</div>";
+  var html = "<div class='accuracy-card'><div class='accuracy-title'>Précision modèle IA</div>";
+  discStats.forEach(function (d) {
+    html += "<div class='accuracy-row' style='margin-bottom:4px'>" +
+      "<span class='accuracy-label'>" + d.disc + "</span>" +
+      "<span style='font-size:16px;font-weight:700;color:var(--blue)'>" + Math.round(d.precision * 100) + "%</span>" +
+      "<span style='font-size:11px;color:var(--text-muted);min-width:80px;text-align:right'>" + d.nb_samples + " courses</span>" +
+      "</div>";
+  });
+  html += "</div>";
+  return html;
 }
 
 // ---- Stats Chart (7 jours) ----
