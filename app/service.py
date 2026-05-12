@@ -10,7 +10,14 @@ from sqlalchemy import select
 
 from app.models import Reunion, Course, Participant, Bet, ScoringWeight
 from app.pmu_client import pmu_client
-from app.scoring import calculer_scores, load_weights_from_config_or_db
+from app.scoring import (
+    calculer_scores,
+    load_weights_from_config_or_db,
+    score_cote as scoring_score_cote,
+    is_value_bet as scoring_is_value_bet,
+    get_confiance,
+    get_weights_for_discipline,
+)
 from app.config import today_str
 
 # Debounce de l'auto-calibration : ne calibrer qu'une fois toutes les 15 minutes max
@@ -191,8 +198,8 @@ async def refresh_programme_statuts(db: AsyncSession) -> int:
 
 async def _refresh_cotes_if_needed(db: AsyncSession, course: Course, reunion: Reunion) -> None:
     """
-    Si des participants ont cote_actuelle=null, re-fetch les cotes depuis l'API PMU
-    et met à jour en base. Ne recalcule pas les scores.
+    Si des participants ont cote_actuelle=null, re-fetch les cotes depuis l'API PMU,
+    met à jour cote_actuelle en base, et recalcule score_cote / score_global / is_value_bet.
     """
     # Vérifier s'il y a des cotes manquantes
     result = await db.execute(
@@ -227,13 +234,43 @@ async def _refresh_cotes_if_needed(db: AsyncSession, course: Course, reunion: Re
     if not cotes_map:
         return
 
-    # Mettre à jour les participants en base
+    # Charger les poids DB pour cette discipline (même logique que load_participants_for_course)
+    db_weights_by_disc = await _get_db_weights_by_discipline(db)
+    w = get_weights_for_discipline(course.discipline, db_weights_by_disc)
+    w_value_cote = w.get("value_cote", 0.0)
+
+    # Mettre à jour les participants en base + recalculer les scores dépendant de la cote
+    updated_count = 0
     for p in participants_without_cote:
         if p.num_pmu in cotes_map:
-            p.cote_actuelle = cotes_map[p.num_pmu]
+            nouvelle_cote = cotes_map[p.num_pmu]
+            p.cote_actuelle = nouvelle_cote
+
+            # Recalculer score_cote (dépend uniquement de cote_actuelle)
+            new_score_cote = scoring_score_cote(nouvelle_cote)
+            delta_cote = new_score_cote - p.score_cote  # old score_cote was 50.0 (cote=None)
+
+            # Mettre à jour score_cote
+            p.score_cote = new_score_cote
+
+            # Ajuster score_global, score_global_expert, score_global_auto
+            # par le delta de la composante value_cote
+            p.score_global = round(p.score_global + delta_cote * w_value_cote, 2)
+            p.score_global_expert = round(p.score_global_expert + delta_cote * w_value_cote, 2)
+            p.score_global_auto = round(p.score_global_auto + delta_cote * w_value_cote, 2)
+            # score_sans_cote exclut la composante cote, pas de changement
+
+            # Recalculer is_value_bet et confiance avec les nouveaux scores
+            p.is_value_bet = scoring_is_value_bet(nouvelle_cote, p.score_global)
+            p.confiance = get_confiance(p.score_global)
+
+            updated_count += 1
 
     await db.commit()
-    logger.info("Cotes mises à jour pour course %s: %d participants", course.libelle, len(cotes_map))
+    logger.info(
+        "Cotes + scores mis à jour pour course %s: %d participants (w_value_cote=%.2f)",
+        course.libelle, updated_count, w_value_cote,
+    )
 
 
 async def load_participants_for_course(db: AsyncSession, course: Course, reunion: Reunion) -> bool:
