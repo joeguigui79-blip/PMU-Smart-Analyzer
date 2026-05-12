@@ -42,7 +42,13 @@ OBSTACLE (HAIE / STEEPLE / CROSS) :
 
 import re
 import logging
-from app.config import SCORING_WEIGHTS, SCORING_WEIGHTS_DISCIPLINE, VALUE_BET_FACTOR, VALUE_BET_MIN_SCORE
+from app.config import (
+    SCORING_WEIGHTS,
+    SCORING_WEIGHTS_DISCIPLINE,
+    VALUE_BET_FACTOR,
+    VALUE_BET_MIN_SCORE,
+    VALUE_BET_THRESHOLDS_DISCIPLINE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -831,17 +837,25 @@ def get_weights_for_discipline(discipline: str, db_weights_by_disc: dict | None 
     return SCORING_WEIGHTS_DISCIPLINE.get("PLAT", {}).copy()
 
 
-def is_value_bet(cote: float | None, score_global: float) -> bool:
+def is_value_bet(cote: float | None, score_global: float, discipline: str = "PLAT") -> bool:
     """
     Détecte si un cheval est un value bet.
     La détection value bet est séparée du score_cote et n'influence pas le score global.
     Un value bet est un cheval dont le score estimé dépasse ce que la cote suggère.
+    Utilise des seuils spécifiques par discipline (section 5.2).
     """
-    if cote is None or cote <= 1.0 or score_global < VALUE_BET_MIN_SCORE:
+    norm_disc = _normalize_discipline(discipline)
+    thresholds = VALUE_BET_THRESHOLDS_DISCIPLINE.get(
+        norm_disc,
+        {"min_score": VALUE_BET_MIN_SCORE, "factor": VALUE_BET_FACTOR},
+    )
+    min_score = thresholds["min_score"]
+    factor = thresholds["factor"]
+    if cote is None or cote <= 1.0 or score_global < min_score:
         return False
     prob_implicite = 1.0 / cote
     prob_estimee = score_global / 100.0
-    return prob_estimee >= prob_implicite * VALUE_BET_FACTOR
+    return prob_estimee >= prob_implicite * factor
 
 
 def get_confiance(score: float) -> str:
@@ -1265,7 +1279,7 @@ def calculer_scores(
         # Pas de bonus outsider (il dépend de la cote)
         score_sans_cote = round(sg_sans_cote, 2)
 
-        is_vb = is_value_bet(cote, score_global)
+        is_vb = is_value_bet(cote, score_global, discipline)
         confiance = get_confiance(score_global)
         explication = generer_explication(
             nom, score_global, s_forme, s_cote, cote, musique, is_vb, confiance,

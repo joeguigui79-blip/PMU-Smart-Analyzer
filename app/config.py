@@ -104,5 +104,16 @@ SCORING_WEIGHTS_DISCIPLINE = {
 SCORING_WEIGHTS = SCORING_WEIGHTS_DISCIPLINE['PLAT']
 
 # Seuil value bet : cote réelle >= facteur * probabilité implicite estimée
+# Seuils globaux (rétro-compatibilité / fallback)
 VALUE_BET_FACTOR = 1.38
 VALUE_BET_MIN_SCORE = 60
+
+# Seuils value bet par discipline (section 5.2)
+VALUE_BET_THRESHOLDS_DISCIPLINE = {
+    "PLAT":        {"min_score": 62, "factor": 1.45},
+    "TROT_ATTELE": {"min_score": 60, "factor": 1.30},
+    "TROT_MONTE":  {"min_score": 58, "factor": 1.32},
+    "HAIE":        {"min_score": 62, "factor": 1.40},
+    "STEEPLE":     {"min_score": 62, "factor": 1.40},
+    "CROSS":       {"min_score": 62, "factor": 1.40},
+}

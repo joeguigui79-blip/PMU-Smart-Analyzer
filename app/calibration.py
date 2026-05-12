@@ -26,7 +26,21 @@ from app.scoring import _normalize_discipline
 
 logger = logging.getLogger(__name__)
 
-MIN_COURSES_PAR_DISCIPLINE = 10
+MIN_COURSES_PAR_DISCIPLINE: dict[str, int] = {
+    "PLAT":        40,
+    "TROT_ATTELE": 40,
+    # Autres disciplines : 20 (voir MIN_COURSES_DEFAULT)
+}
+MIN_COURSES_DEFAULT = 20
+
+# Planchers/plafonds appliqués APRÈS shrinkage, AVANT renormalisation (section 5.3.D.A)
+# Format : critere -> (plancher | None, plafond | None)
+CALIBRATION_CAPS: dict[str, tuple] = {
+    "partants":      (None, 0.08),
+    "value_cote":    (None, 0.22),
+    "forme_recente": (0.20, None),
+    "jockey":        (0.06, None),   # appliqué seulement si jockey est dans les critères
+}
 
 # Mapping critère → champ score dans Participant
 CRITERE_FIELD_MAP = {
@@ -154,7 +168,8 @@ async def compute_auto_weights(db: AsyncSession) -> dict[str, dict[str, float]]:
         # On utilise len(rows) >= MIN * 2 comme proxy (min 2 chevaux par course)
         positions = [r["position"] for r in rows]
         # Estimer le nombre de courses via la variance des positions (minimum check)
-        if len(rows) < MIN_COURSES_PAR_DISCIPLINE * 2:
+        min_courses = MIN_COURSES_PAR_DISCIPLINE.get(disc, MIN_COURSES_DEFAULT)
+        if len(rows) < min_courses * 2:
             logger.info(
                 "Calibration [%s]: pas assez de données (%d participants)", disc, len(rows)
             )
@@ -185,8 +200,32 @@ async def compute_auto_weights(db: AsyncSession) -> dict[str, dict[str, float]]:
             )
             continue
 
-        # Normaliser
-        weights = {k: round(v / total_corr, 4) for k, v in correlations.items()}
+        # Normaliser les corrélations brutes
+        raw_weights = {k: v / total_corr for k, v in correlations.items()}
+
+        # B) Shrinkage vers les poids experts (section 5.3.D.B) — AVANT les caps
+        shrunk = {
+            k: 0.7 * raw_weights[k] + 0.3 * expert_weights.get(k, 0.0)
+            for k in raw_weights
+        }
+
+        # A) Planchers/plafonds par critère (section 5.3.D.A)
+        capped = {}
+        for k, v in shrunk.items():
+            floor_val, ceiling_val = CALIBRATION_CAPS.get(k, (None, None))
+            if floor_val is not None:
+                v = max(v, floor_val)
+            if ceiling_val is not None:
+                v = min(v, ceiling_val)
+            capped[k] = v
+
+        # C) Renormaliser pour que le total = 1.00 (section 5.3.D.C)
+        total_capped = sum(capped.values())
+        if total_capped > 0:
+            weights = {k: round(v / total_capped, 4) for k, v in capped.items()}
+        else:
+            weights = {k: round(v, 4) for k, v in raw_weights.items()}
+
         auto_weights[disc] = weights
         logger.info("Calibration [%s]: poids calculés → %s", disc, weights)
 

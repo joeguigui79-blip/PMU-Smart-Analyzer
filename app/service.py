@@ -261,7 +261,7 @@ async def _refresh_cotes_if_needed(db: AsyncSession, course: Course, reunion: Re
             # score_sans_cote exclut la composante cote, pas de changement
 
             # Recalculer is_value_bet et confiance avec les nouveaux scores
-            p.is_value_bet = scoring_is_value_bet(nouvelle_cote, p.score_global)
+            p.is_value_bet = scoring_is_value_bet(nouvelle_cote, p.score_global, course.discipline)
             p.confiance = get_confiance(p.score_global)
 
             updated_count += 1
