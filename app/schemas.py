@@ -158,6 +158,14 @@ class ScoringAccuracyByDisciplineSchema(BaseModel):
     nb_samples: int
 
 
+class ScoringAccuracyTrendSchema(BaseModel):
+    discipline: str
+    precision_all: float
+    nb_all: int
+    precision_recent: float
+    nb_recent: int
+
+
 # ---- F3 : Suggestions combos ----
 
 class CourseSuggestionsSchema(BaseModel):

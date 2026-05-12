@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.database import get_db
 from app.models import Bet, Course, Participant, ScoringWeight
-from app.schemas import ScoringAccuracySchema, ScoringAccuracyByDisciplineSchema
+from app.schemas import ScoringAccuracySchema, ScoringAccuracyByDisciplineSchema, ScoringAccuracyTrendSchema
 from app.config import SCORING_WEIGHTS, SCORING_WEIGHTS_DISCIPLINE
 from app.scoring import _normalize_discipline
 
@@ -70,6 +70,73 @@ async def get_accuracy_by_discipline(db: AsyncSession = Depends(get_db)):
         )
         for row in rows
     ]
+
+
+@router.get("/accuracy-trend", response_model=list[ScoringAccuracyTrendSchema])
+async def get_accuracy_trend(db: AsyncSession = Depends(get_db)):
+    """Précision globale vs 30 dernières courses par discipline (pour indicateur de tendance)."""
+    # Récupérer toutes les courses terminées, du plus récent au plus ancien
+    courses_result = await db.execute(
+        select(Course)
+        .where(Course.statut_resultat == "TERMINE")
+        .order_by(Course.id.desc())
+    )
+    all_courses = courses_result.scalars().all()
+
+    if not all_courses:
+        return []
+
+    # Récupérer les participants avec arrivée en une seule requête groupée
+    course_ids = [c.id for c in all_courses]
+    p_result = await db.execute(
+        select(Participant)
+        .where(Participant.course_id.in_(course_ids))
+        .where(Participant.position_arrivee.isnot(None))
+    )
+    participants_all = p_result.scalars().all()
+
+    # Indexer les participants par course_id
+    part_by_course: dict[int, list] = {}
+    for p in participants_all:
+        if p.course_id not in part_by_course:
+            part_by_course[p.course_id] = []
+        part_by_course[p.course_id].append(p)
+
+    # Grouper les courses par discipline (ordre décroissant conservé)
+    by_disc: dict[str, list] = {}
+    for c in all_courses:
+        disc = _normalize_discipline(c.discipline)
+        if disc not in by_disc:
+            by_disc[disc] = []
+        by_disc[disc].append(c)
+
+    def calc_prec(course_list):
+        total = 0
+        correct = 0
+        for c in course_list:
+            parts = part_by_course.get(c.id, [])
+            if not parts:
+                continue
+            total += 1
+            best = max(parts, key=lambda p: p.score_global or 0.0)
+            if best.position_arrivee == 1:
+                correct += 1
+        return (round(correct / total, 4) if total > 0 else 0.0), total
+
+    result = []
+    for disc, disc_courses in by_disc.items():
+        prec_all, nb_all = calc_prec(disc_courses)
+        recent = disc_courses[:30]  # 30 plus récentes (déjà triées id desc)
+        prec_recent, nb_recent = calc_prec(recent)
+        result.append(ScoringAccuracyTrendSchema(
+            discipline=disc,
+            precision_all=prec_all,
+            nb_all=nb_all,
+            precision_recent=prec_recent,
+            nb_recent=nb_recent,
+        ))
+
+    return sorted(result, key=lambda x: x.discipline)
 
 
 @router.get("/discipline-stats")

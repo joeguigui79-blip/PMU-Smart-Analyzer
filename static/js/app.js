@@ -162,16 +162,17 @@ async function loadDashboard() {
   document.querySelectorAll(".date-badge").forEach(function (el) { el.textContent = dateLabel; });
 
   try {
-    const [data, stats, accuracy] = await Promise.all([
+    const [data, stats, accuracy, trend] = await Promise.all([
       API.dashboard(),
       API.stats().catch(function () { return null; }),
       API.scoringAccuracyByDiscipline().catch(function () { return null; }),
+      API.scoringAccuracyTrend().catch(function () { return null; }),
     ]);
     if (data && data.offline) {
       content.innerHTML = "<div class='empty-state'><div class='empty-icon'>📵</div><div class='empty-title'>Hors ligne</div><p style='color:var(--text-muted);font-size:13px'>Reconnectez-vous pour voir les données du jour.</p></div>";
       return;
     }
-    renderDashboard(data, stats, accuracy);
+    renderDashboard(data, stats, accuracy, trend);
     _markPageLoaded("dashboard");
   } catch (e) {
     console.error("Dashboard error:", e);
@@ -180,7 +181,7 @@ async function loadDashboard() {
   }
 }
 
-function renderDashboard(data, stats, accuracy) {
+function renderDashboard(data, stats, accuracy, trend) {
   const content = document.getElementById("dashboard-content");
 
   const dateStr = data.date;
@@ -197,7 +198,7 @@ function renderDashboard(data, stats, accuracy) {
 
   // F2 : Précision du modèle globale
   if (accuracy && accuracy.length) {
-    html += renderAccuracyCard(accuracy);
+    html += renderAccuracyCard(accuracy, trend);
   }
 
   if (stats && stats.length) {
@@ -254,9 +255,16 @@ function renderDashboard(data, stats, accuracy) {
 }
 
 // ---- F2 : Card précision modèle ----
-function renderAccuracyCard(accuracy) {
+function renderAccuracyCard(accuracy, trend) {
   // accuracy vient de /api/scoring/accuracy-by-discipline
   // Format: [{discipline, critere, poids, precision, nb_samples}, ...]
+  // trend (optionnel): [{discipline, precision_all, nb_all, precision_recent, nb_recent}, ...]
+
+  // Index trend par discipline
+  var trendByDisc = {};
+  if (trend && trend.length) {
+    trend.forEach(function (t) { trendByDisc[t.discipline] = t; });
+  }
 
   // Grouper par discipline
   var byDisc = {};
@@ -283,9 +291,25 @@ function renderAccuracyCard(accuracy) {
 
   var html = "<div class='accuracy-card'><div class='accuracy-title'>Précision modèle IA</div>";
   discStats.forEach(function (d) {
+    // Indicateur de tendance basé sur les 30 dernières courses
+    var trendHtml = "";
+    var t = trendByDisc[d.disc];
+    if (t && t.nb_recent >= 5) {
+      var diff = (t.precision_recent - t.precision_all) * 100; // en points de %
+      if (diff >= 2) {
+        trendHtml = "<span title='Hausse: +" + Math.round(diff) + " pts sur 30 dernières courses' " +
+          "style='font-size:13px;color:var(--green);margin-left:4px;font-weight:700'>↑</span>";
+      } else if (diff <= -2) {
+        trendHtml = "<span title='Baisse: " + Math.round(diff) + " pts sur 30 dernières courses' " +
+          "style='font-size:13px;color:var(--red);margin-left:4px;font-weight:700'>↓</span>";
+      } else {
+        trendHtml = "<span title='Stable (écart: " + (diff >= 0 ? "+" : "") + Math.round(diff) + " pts sur 30 dernières courses)' " +
+          "style='font-size:13px;color:var(--orange, #f59e0b);margin-left:4px;font-weight:700'>→</span>";
+      }
+    }
     html += "<div class='accuracy-row' style='margin-bottom:4px'>" +
       "<span class='accuracy-label'>" + d.disc + "</span>" +
-      "<span style='font-size:16px;font-weight:700;color:var(--blue)'>" + Math.round(d.precision * 100) + "%</span>" +
+      "<span style='font-size:16px;font-weight:700;color:var(--blue)'>" + Math.round(d.precision * 100) + "%" + trendHtml + "</span>" +
       "<span style='font-size:11px;color:var(--text-muted);min-width:80px;text-align:right'>" + d.nb_samples + " courses</span>" +
       "</div>";
   });

@@ -101,6 +101,7 @@ const API = {
   // ---- F2 : Scoring ----
   scoringAccuracy: function () { return apiFetch("/api/scoring/accuracy"); },
   scoringAccuracyByDiscipline: function () { return apiFetch("/api/scoring/accuracy-by-discipline"); },
+  scoringAccuracyTrend: function () { return apiFetch("/api/scoring/accuracy-trend"); },
   scoringDisciplineStats: function () { return apiFetch("/api/scoring/discipline-stats"); },
   scoringOptimize: function () { return apiFetch("/api/scoring/optimize", { method: "POST" }); },
 
