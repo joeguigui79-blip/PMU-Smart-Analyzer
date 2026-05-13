@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models import Course, Participant, Reunion
 from app.config import today_str
-from app.routers.bilan_router import get_bilan
+from app.routers.bilan_router import get_bilan, PARIS_ALIASES
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["pronostics"])
@@ -160,7 +160,8 @@ async def get_pronostics(
                 if isinstance(parsed, list):
                     paris_dispo = {str(p).upper() for p in parsed}
             except (json.JSONDecodeError, ValueError):
-                pass
+                # Stocké en CSV par service.py (ex: "GAGNANT,MINI_MULTI,TIERCE")
+                paris_dispo = {p.strip().upper() for p in paris_dispo_raw.split(",") if p.strip()}
 
         course_pronostics = []
 
@@ -168,9 +169,11 @@ async def get_pronostics(
             if pari_key not in CHEVAUX_PAR_PARI:
                 continue
 
-            # Ne proposer que les paris disponibles pour cette course
-            if paris_dispo and pari_key not in paris_dispo:
-                continue
+            # Ne proposer que les paris disponibles pour cette course (via les aliases PMU)
+            if paris_dispo:
+                pari_aliases = PARIS_ALIASES.get(pari_key, [pari_key])
+                if not any(alias.upper() in paris_dispo for alias in pari_aliases):
+                    continue
 
             # Trouver le meilleur mode pour ce pari
             best_mode = None
