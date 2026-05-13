@@ -16,7 +16,7 @@ from app.database import get_db
 from app.models import Participant, Course, CalibrationWeight, Reunion
 from app.scoring import _normalize_discipline
 from app.config import SCORING_WEIGHTS_DISCIPLINE
-from app.calibration import calibrate_and_store, get_calibration_status, MIN_COURSES_PAR_DISCIPLINE
+from app.calibration import calibrate_and_store, get_calibration_status, MIN_COURSES_PAR_DISCIPLINE, MIN_COURSES_DEFAULT
 from app.service import refresh_programme_statuts
 
 logger = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
         nb = r["nb_courses"]
         result[disc] = {
             "nb_courses":    nb,
-            "has_auto_data": nb >= MIN_COURSES_PAR_DISCIPLINE,
+            "has_auto_data": nb >= MIN_COURSES_PAR_DISCIPLINE.get(disc, MIN_COURSES_DEFAULT),
             "expert":    {"top1_rate": r["expert"]},
             "auto":      {"top1_rate": r["auto"]},
             "sans_cote": {"top1_rate": r["sans_cote"]},
@@ -298,8 +298,8 @@ async def stats_calibration(db: AsyncSession = Depends(get_db)):
 
         disciplines_info[disc] = {
             "nb_courses_terminées":  nb_courses,
-            "min_courses_required":  MIN_COURSES_PAR_DISCIPLINE,
-            "calibration_progress":  round(100 * min(nb_courses, MIN_COURSES_PAR_DISCIPLINE) / MIN_COURSES_PAR_DISCIPLINE, 0),
+            "min_courses_required":  MIN_COURSES_PAR_DISCIPLINE.get(disc, MIN_COURSES_DEFAULT),
+            "calibration_progress":  round(100 * min(nb_courses, MIN_COURSES_PAR_DISCIPLINE.get(disc, MIN_COURSES_DEFAULT)) / MIN_COURSES_PAR_DISCIPLINE.get(disc, MIN_COURSES_DEFAULT), 0),
             "is_calibrated":         is_calibrated,
             "active_mode":           active_mode,
             "expert_weights":        expert_weights,
