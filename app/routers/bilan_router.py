@@ -69,6 +69,9 @@ PARIS_LABELS = {
     "MULTI_5":          "Multi en 5",
     "MULTI_6":          "Multi en 6",
     "MULTI_7":          "Multi en 7",
+    "MINI_MULTI_4":     "Mini Multi 4",
+    "MINI_MULTI_5":     "Mini Multi 5",
+    "MINI_MULTI_6":     "Mini Multi 6",
     "TRIO_ORDRE":       "Trio Ordre",
     "TRIO":             "Trio",
     "SUPER4":           "Super4",
@@ -95,10 +98,13 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "QUINTE_BONUS4":    ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "quinte", "QUINTE+"],
     "QUINTE_BONUS3":    ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "quinte", "QUINTE+"],
     "DEUX_SUR_QUATRE":  ["DEUX_SUR_QUATRE", "E_DEUX_SUR_QUATRE", "2sur4", "2SUR4"],
-    "MULTI_4":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
-    "MULTI_5":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
-    "MULTI_6":          ["MULTI", "E_MULTI", "MINI_MULTI", "E_MINI_MULTI"],
+    "MULTI_4":          ["MULTI", "E_MULTI"],
+    "MULTI_5":          ["MULTI", "E_MULTI"],
+    "MULTI_6":          ["MULTI", "E_MULTI"],
     "MULTI_7":          ["MULTI", "E_MULTI"],
+    "MINI_MULTI_4":     ["MINI_MULTI", "E_MINI_MULTI"],
+    "MINI_MULTI_5":     ["MINI_MULTI", "E_MINI_MULTI"],
+    "MINI_MULTI_6":     ["MINI_MULTI", "E_MINI_MULTI"],
     "TRIO_ORDRE":       ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
     "TRIO":             ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
     "SUPER4":           ["SUPER_QUATRE", "E_SUPER_QUATRE"],
@@ -445,6 +451,30 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
         top7 = {sorted_participants[i].num_pmu for i in range(7)}
         real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
         return len(top7 & real_top4) >= 4
+
+    elif pari_key == "MINI_MULTI_4":
+        # Mini Multi en 4 : top4 tous dans top4 (identique à MULTI_4, mais pour courses MINI_MULTI)
+        if len(sorted_participants) < 4:
+            return False
+        top4 = {sorted_participants[i].num_pmu for i in range(4)}
+        real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
+        return top4 == real_top4
+
+    elif pari_key == "MINI_MULTI_5":
+        # Mini Multi en 5 : top5, au moins 4 dans top4
+        if len(sorted_participants) < 5:
+            return False
+        top5 = {sorted_participants[i].num_pmu for i in range(5)}
+        real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
+        return len(top5 & real_top4) >= 4
+
+    elif pari_key == "MINI_MULTI_6":
+        # Mini Multi en 6 : top6, au moins 4 dans top4
+        if len(sorted_participants) < 6:
+            return False
+        top6 = {sorted_participants[i].num_pmu for i in range(6)}
+        real_top4 = {num for num, pos in positions.items() if pos is not None and pos <= 4}
+        return len(top6 & real_top4) >= 4
 
     elif pari_key == "TRIO_ORDRE":
         # top3 dans l'ordre exact (1er, 2ème, 3ème)

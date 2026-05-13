@@ -1783,11 +1783,30 @@ function renderBilanPage(data) {
     "TIERCE_ORDRE", "TIERCE_DESORDRE",
     "QUARTE_ORDRE", "QUARTE_DESORDRE", "QUARTE_BONUS3",
     "QUINTE_ORDRE", "QUINTE_DESORDRE", "QUINTE_BONUS4", "QUINTE_BONUS3",
-    "DEUX_SUR_QUATRE", "MULTI_4", "MULTI_5", "MULTI_6", "MULTI_7",
+    "DEUX_SUR_QUATRE",
+    "__sep_multi_classique__",
+    "MULTI_4", "MULTI_5", "MULTI_6", "MULTI_7",
+    "__sep_mini_multi__",
+    "MINI_MULTI_4", "MINI_MULTI_5", "MINI_MULTI_6",
+    "__sep_autres__",
     "TRIO_ORDRE", "TRIO", "SUPER4"
   ];
 
   parisOrder.forEach(function (key) {
+    // Lignes séparatrices avec titre de groupe
+    if (key === "__sep_multi_classique__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Multi classique (9+ partants)</td></tr>';
+      return;
+    }
+    if (key === "__sep_mini_multi__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Mini Multi (&lt;9 partants)</td></tr>';
+      return;
+    }
+    if (key === "__sep_autres__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Autres paris</td></tr>';
+      return;
+    }
+
     var pari = paris[key];
     if (!pari) return;
 
