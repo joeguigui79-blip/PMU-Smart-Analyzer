@@ -29,15 +29,15 @@ def today_str() -> str:
 # Pondérations différenciées par discipline (somme = 1.0 pour chaque)
 SCORING_WEIGHTS_DISCIPLINE = {
     "PLAT": {
-        "forme_recente": 0.35,
-        "value_cote":    0.16,
-        "jockey":        0.10,
-        "entraineur":    0.05,
-        "distance":      0.09,
+        "forme_recente": 0.31,
+        "value_cote":    0.12,
+        "jockey":        0.11,
+        "entraineur":    0.06,
+        "distance":      0.07,
         "terrain":       0.08,
-        "repos":         0.03,
-        "gains":         0.09,
-        "age":           0.02,
+        "repos":         0.06,
+        "gains":         0.12,
+        "age":           0.04,
         "partants":      0.01,
         "hippodrome":    0.02,
     },

@@ -1091,6 +1091,27 @@ def _weights_sans_cote(w: dict) -> dict:
     return {k: (v / restant if k != "value_cote" else 0.0) for k, v in w.items()}
 
 
+def _weights_without_inactive(w: dict, inactive: set) -> dict:
+    """
+    Retourne une copie des poids w en excluant les critères inactifs (données source absentes).
+    Le poids cumulé des critères inactifs est redistribué proportionnellement aux critères actifs.
+
+    Utilisé uniquement pour PLAT, quand une donnée source est absente :
+      - value_cote : cote None ou <= 0
+      - terrain    : penetrometre None ET terrain_course vide
+    """
+    poids_inactifs = sum(w.get(k, 0.0) for k in inactive if k in w)
+    if poids_inactifs <= 0.0:
+        return w.copy()
+    total_actif = 1.0 - poids_inactifs
+    if total_actif <= 0.0:
+        return {k: (0.0 if k in inactive else v) for k, v in w.items()}
+    return {
+        k: (0.0 if k in inactive else round(v / total_actif, 8))
+        for k, v in w.items()
+    }
+
+
 def _compute_score_with_weights(
     w: dict,
     s_forme: float,
@@ -1247,6 +1268,25 @@ def calculer_scores(
             s_regularite = score_regularite_trot(musique)
             s_recence = score_recence_trot(musique)
 
+        # ── Pour PLAT : redistribuer les poids des critères sans données source ──
+        # Ne s'applique qu'au PLAT (pas au trot ni à l'obstacle).
+        # Un critère est "inactif" si sa donnée source est absente (ex: cote=None, pas de terrain).
+        # Son poids est alors redistribué proportionnellement aux critères actifs.
+        w_expert_eff = w_expert
+        w_auto_eff = w_auto
+        if not is_trot and not is_obstacle:
+            _inactive = set()
+            # value_cote : donnée absente si cote None ou <= 0
+            if cote is None or cote <= 0:
+                _inactive.add("value_cote")
+            # terrain : donnée absente si ni pénétromètre ni terrain_course fournis
+            if penetrometre is None and not terrain:
+                _inactive.add("terrain")
+            if _inactive:
+                w_expert_eff = _weights_without_inactive(w_expert, _inactive)
+                if w_auto:
+                    w_auto_eff = _weights_without_inactive(w_auto, _inactive)
+
         # ── Calcul du score Expert (poids manuels) ──────────────────────────
         _kwargs = dict(
             s_forme=s_forme, s_cote=s_cote, s_jockey=s_jockey,
@@ -1256,11 +1296,11 @@ def calculer_scores(
             s_corde=s_corde, s_regularite=s_regularite, s_recence=s_recence,
             is_trot=is_trot, is_obstacle=is_obstacle,
         )
-        sg_expert = _compute_score_with_weights(w_expert, **_kwargs)
+        sg_expert = _compute_score_with_weights(w_expert_eff, **_kwargs)
 
         # ── Calcul du score Auto-calibré (si poids disponibles) ──────────
         if w_auto:
-            sg_auto = _compute_score_with_weights(w_auto, **_kwargs)
+            sg_auto = _compute_score_with_weights(w_auto_eff, **_kwargs)
         else:
             sg_auto = sg_expert  # fallback
 
@@ -1274,7 +1314,7 @@ def calculer_scores(
         sg_auto_final = round(sg_auto + s_outsider, 2)
 
         # ── Score sans cote (redistribution proportionnelle des poids) ─────────
-        w_sc = _weights_sans_cote(w_expert)
+        w_sc = _weights_sans_cote(w_expert_eff)
         sg_sans_cote = _compute_score_with_weights(w_sc, **_kwargs)
         # Pas de bonus outsider (il dépend de la cote)
         score_sans_cote = round(sg_sans_cote, 2)
