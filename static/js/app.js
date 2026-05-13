@@ -1548,7 +1548,8 @@ function renderPronosticsPage(data) {
     html += '<h3 style="margin:0;font-size:15px">R' + course.reunion_num + 'C' + course.course_num + ' \u2014 ' + course.libelle + '</h3>';
     html += '<span class="badge badge-gray" style="font-size:11px">' + (course.discipline || "") + '</span>';
     html += '</div>';
-    html += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">' + (course.hippodrome || "") + '</div>';
+    var heureStr = course.heure_depart ? H().formatTime(course.heure_depart) : "";
+    html += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">' + (course.hippodrome || "") + (heureStr ? ' &mdash; ' + heureStr : '') + '</div>';
 
     for (var p = 0; p < course.pronostics.length; p++) {
       var prono = course.pronostics[p];

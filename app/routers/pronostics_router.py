@@ -3,6 +3,7 @@ Endpoint /api/pronostics
 Génère des recommandations de paris pour les courses du jour
 basées sur les taux de réussite historiques du bilan.
 """
+import json
 import logging
 from typing import Optional
 
@@ -130,7 +131,7 @@ async def get_pronostics(
         .where(Reunion.date_str == date)
         .where(Course.statut_resultat != "TERMINE")
         .options(selectinload(Course.participants), selectinload(Course.reunion))
-        .order_by(Reunion.num_officiel, Course.num_externe)
+        .order_by(Course.heure_depart.nullslast(), Reunion.num_officiel, Course.num_externe)
     )
     courses = result.scalars().all()
 
@@ -149,10 +150,26 @@ async def get_pronostics(
             bilan = bilan_all
 
         paris_data = bilan.get("paris", {})
+
+        # Récupérer les paris disponibles pour cette course (filtrage strict)
+        paris_dispo_raw = course.paris_disponibles or ""
+        paris_dispo: set = set()
+        if paris_dispo_raw.strip():
+            try:
+                parsed = json.loads(paris_dispo_raw)
+                if isinstance(parsed, list):
+                    paris_dispo = {str(p).upper() for p in parsed}
+            except (json.JSONDecodeError, ValueError):
+                pass
+
         course_pronostics = []
 
         for pari_key, pari_info in paris_data.items():
             if pari_key not in CHEVAUX_PAR_PARI:
+                continue
+
+            # Ne proposer que les paris disponibles pour cette course
+            if paris_dispo and pari_key not in paris_dispo:
                 continue
 
             # Trouver le meilleur mode pour ce pari
@@ -222,6 +239,7 @@ async def get_pronostics(
                 "libelle": course.libelle or f"C{course.num_externe}",
                 "discipline": course.discipline,
                 "hippodrome": reunion.hippodrome_libelle,
+                "heure_depart": course.heure_depart.isoformat() if course.heure_depart else None,
                 "pronostics": course_pronostics,
             })
 
