@@ -1520,7 +1520,13 @@ function renderPronosticsPage(data) {
       });
     }
   }
-  allPronos.sort(function(a, b) { return b.prono.taux - a.prono.taux; });
+  allPronos.sort(function(a, b) {
+    var ha = a.course.heure_depart || '';
+    var hb = b.course.heure_depart || '';
+    if (ha < hb) return -1;
+    if (ha > hb) return 1;
+    return b.prono.taux - a.prono.taux;
+  });
 
   // Afficher le top 10 confiance
   html += '<div class="stats-card" style="margin-bottom:20px">';
