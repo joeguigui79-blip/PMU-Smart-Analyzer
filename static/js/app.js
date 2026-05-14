@@ -1232,20 +1232,26 @@ window.showParticipantModal = showParticipantModal;
 function navigateToPronosticsAndScroll(courseId) {
   navigate("pronostics");
   // Attendre que la page pronostics soit chargée puis scroller vers la course
-  var _maxTries = 20;
+  var _maxTries = 40;
   var _tries = 0;
   function _tryScroll() {
     var el = document.getElementById("prono-course-" + courseId);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      el.style.outline = "2px solid var(--gold)";
-      setTimeout(function () { el.style.outline = ""; }, 1500);
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Surlignage doré via classe CSS (CSS variables non résolues en inline style)
+      el.classList.remove("highlight-gold-fade");
+      el.classList.add("highlight-gold");
+      setTimeout(function () {
+        el.classList.remove("highlight-gold");
+        el.classList.add("highlight-gold-fade");
+        setTimeout(function () { el.classList.remove("highlight-gold-fade"); }, 1200);
+      }, 2000);
     } else if (_tries < _maxTries) {
       _tries++;
-      setTimeout(_tryScroll, 200);
+      setTimeout(_tryScroll, 250);
     }
   }
-  setTimeout(_tryScroll, 300);
+  setTimeout(_tryScroll, 350);
 }
 window.navigateToPronosticsAndScroll = navigateToPronosticsAndScroll;
 window.showBetModal = showBetModal;
