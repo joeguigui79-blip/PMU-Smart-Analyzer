@@ -1432,16 +1432,4 @@ td.best-cell { background: rgba(34, 197, 94, 0.10); font-weight: 700; border-rad
   }
 }
 
-/* ---- Highlight navigation depuis dashboard ---- */
-.highlight-gold {
-  outline: 2px solid var(--gold) !important;
-  background: var(--gold-dim) !important;
-  transition: outline 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
-  box-shadow: 0 0 0 4px var(--gold-dim) !important;
-}
-.highlight-gold-fade {
-  outline: 2px solid transparent !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  transition: outline 1.2s ease, background 1.2s ease, box-shadow 1.2s ease;
-}
+

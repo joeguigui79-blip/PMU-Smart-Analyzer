@@ -232,7 +232,12 @@ async def get_pronostics(
                 "mode_label": MODE_LABELS[best_mode],
                 "taux": round(best_taux, 1),
                 "chevaux": [
-                    {"num_pmu": c.num_pmu, "nom": c.nom, "score": round(_get_score_for_mode(c, best_mode), 1)}
+                    {
+                        "num_pmu": c.num_pmu,
+                        "nom": c.nom,
+                        "score": round(_get_score_for_mode(c, best_mode), 1),
+                        "is_value_bet": bool(c.is_value_bet),
+                    }
                     for c in chevaux
                 ],
             })

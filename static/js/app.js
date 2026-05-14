@@ -236,7 +236,7 @@ function renderDashboard(data, stats, accuracy, trend) {
           "</div>";
       }
       var onclickAttr = courseInfo
-        ? "onclick='navigateToPronosticsAndScroll(" + p.course_id + ")' style='padding:12px 16px;cursor:pointer'"
+        ? "onclick='navigate(\"pronostics\")' style='padding:12px 16px;cursor:pointer'"
         : "style='padding:12px 16px'";
       html += "<div class='card clickable' " + onclickAttr + ">" +
         "<div style='display:flex;align-items:center;gap:10px'>" +
@@ -1228,32 +1228,6 @@ document.addEventListener("DOMContentLoaded", function () {
 window.showCourse = showCourse;
 window.showParticipantModal = showParticipantModal;
 
-// ---- Navigation vers pronostics avec scroll sur une course ----
-function navigateToPronosticsAndScroll(courseId) {
-  navigate("pronostics");
-  // Attendre que la page pronostics soit chargée puis scroller vers la course
-  var _maxTries = 40;
-  var _tries = 0;
-  function _tryScroll() {
-    var el = document.getElementById("prono-course-" + courseId);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      // Surlignage doré via classe CSS (CSS variables non résolues en inline style)
-      el.classList.remove("highlight-gold-fade");
-      el.classList.add("highlight-gold");
-      setTimeout(function () {
-        el.classList.remove("highlight-gold");
-        el.classList.add("highlight-gold-fade");
-        setTimeout(function () { el.classList.remove("highlight-gold-fade"); }, 1200);
-      }, 2000);
-    } else if (_tries < _maxTries) {
-      _tries++;
-      setTimeout(_tryScroll, 250);
-    }
-  }
-  setTimeout(_tryScroll, 350);
-}
-window.navigateToPronosticsAndScroll = navigateToPronosticsAndScroll;
 window.showBetModal = showBetModal;
 window.placeSuggestedBet = placeSuggestedBet;
 window.placeSuggestedBetByKey = placeSuggestedBetByKey;
@@ -1591,13 +1565,15 @@ function renderPronosticsPage(data) {
   for (var t = 0; t < topN; t++) {
     var item = allPronos[t];
     var chevNums = item.prono.chevaux.map(function(ch) { return ch.num_pmu; }).join("-");
+    var hasVb = item.prono.chevaux.some(function(ch) { return ch.is_value_bet; });
     var confClass = item.prono.taux >= 50 ? "bilan-green" : item.prono.taux >= 40 ? "bilan-orange" : "bilan-red";
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px ' + (hasVb ? '4' : '0') + 'px;border-bottom:1px solid var(--border)' + (hasVb ? ';background:var(--gold-dim);border-radius:6px;border:1px solid var(--gold)' : '') + '">';
     html += '<span class="' + confClass + '" style="font-weight:700;min-width:45px">' + item.prono.taux + '%</span>';
     html += '<span style="font-size:12px;color:var(--text-secondary)">R' + item.course.reunion_num + 'C' + item.course.course_num + '</span>';
     html += '<span style="font-weight:600">' + item.prono.pari_label + '</span>';
     html += '<span style="font-size:12px;background:var(--surface);padding:2px 6px;border-radius:4px">' + item.prono.mode_label + '</span>';
     html += '<span style="font-weight:700;color:var(--gold)">' + chevNums + '</span>';
+    if (hasVb) html += '<span style="font-size:10px;font-weight:700;color:var(--gold);margin-left:auto">VB</span>';
     html += '</div>';
   }
   html += '</div>';
@@ -1615,9 +1591,14 @@ function renderPronosticsPage(data) {
 
     for (var p = 0; p < course.pronostics.length; p++) {
       var prono = course.pronostics[p];
-      var chevStr = prono.chevaux.map(function(ch) { return ch.num_pmu + "-" + ch.nom; }).join(" + ");
+      var hasVb = prono.chevaux.some(function(ch) { return ch.is_value_bet; });
+      var chevStr = prono.chevaux.map(function(ch) {
+        var vbMark = ch.is_value_bet ? ' <span style="font-size:10px;font-weight:700;color:var(--gold)">[VB]</span>' : '';
+        return ch.num_pmu + "-" + ch.nom + vbMark;
+      }).join(" + ");
       var confClass = prono.taux >= 50 ? "bilan-green" : prono.taux >= 40 ? "bilan-orange" : "bilan-red";
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">';
+      var rowBg = hasVb ? 'background:var(--gold-dim);border-radius:6px;padding:4px 6px;border:1px solid rgba(245,166,35,0.4);' : 'padding:4px 0;';
+      html += '<div style="display:flex;align-items:center;gap:8px;' + rowBg + '">';
       html += '<span class="' + confClass + '" style="font-weight:700;min-width:45px;font-size:13px">' + prono.taux + '%</span>';
       html += '<span style="font-weight:600;font-size:13px">' + prono.pari_label + '</span>';
       html += '<span style="font-size:11px;background:var(--surface);padding:2px 5px;border-radius:4px">' + prono.mode_label + '</span>';
