@@ -8,9 +8,8 @@ Endpoint :
 Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Gagnant       : top1 finit 1er
   - Place         : top1 finit dans top3 (≥8 partants) ou top2 (4–7 partants)
-  - Couple Gagnant: top2 tous dans top2 (sans ordre)
+  - Couple Gagnant: top2 tous dans top2 (sans ordre) — uniquement ≥8 partants
   - Couple Place  : top2 tous dans top3 (≥8 partants) ou dans l'ordre exact (4–7 partants, couple place = couple ordre)
-  - Couple Ordre  : top1 est 1er ET top2 est 2ème
   - Tierce        : top3 tous dans top3
   - Quarte+       : top4 tous dans top4
   - Quinte+       : top5 tous dans top5
@@ -24,8 +23,8 @@ Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Super4        : top4 dans l'ordre exact, uniquement si nb_partants entre 5 et 9
 
 Catégories Placé séparées par nombre de partants :
-  - 8 partants ou plus : Place 1, Place 2, Place 3 + Couple Placé 1-2, 2-3, 1-3
-  - 4 à 7 partants     : Place 1, Place 2 seulement (pas de Place 3 ni couples impliquant le 3ème)
+  - 8 partants ou plus : Place 1, Place 2, Place 3 + Couple Gagnant + Couple Placé 1-2, 2-3, 1-3
+  - 4 à 7 partants     : Place 1, Place 2 seulement + C. Placé 1-2 (ordre exact)
 
 Seuls les paris présents dans course.paris_disponibles sont comptabilisés.
 Seules les courses avec des position_arrivee renseignées sont prises en compte.
@@ -71,7 +70,6 @@ PARIS_LABELS = {
     "COUPLE_PLACE_12":      "C. Plac\u00e9 1-2",
     "COUPLE_PLACE_23":      "C. Plac\u00e9 2-3",
     "COUPLE_PLACE_13":      "C. Plac\u00e9 1-3",
-    "COUPLE_ORDRE":         "Coupl\u00e9 Ordre",
     "TIERCE_ORDRE":     "Tierc\u00e9 Ordre",
     "TIERCE_DESORDRE":  "Tierc\u00e9 D\u00e9sordre",
     "QUARTE_ORDRE":     "Quart\u00e9+ Ordre",
@@ -116,7 +114,6 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "COUPLE_PLACE_12":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     "COUPLE_PLACE_23":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     "COUPLE_PLACE_13":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
-    "COUPLE_ORDRE":     ["COUPLE_ORDRE", "E_COUPLE_ORDRE", "couple_ordre"],
     "TIERCE_ORDRE":     ["TIERCE", "E_TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
     "TIERCE_DESORDRE":  ["TIERCE", "E_TIERCE", "tierce", "TIERCE_ORDRE", "TIERCE_DESORDRE"],
     "QUARTE_ORDRE":     ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "quarte", "QUARTE+"],
@@ -212,7 +209,8 @@ def _process_course_for_stats(
 
         # Filtrage par nombre de partants pour les clés spécialisées Placé
         if pari_key in ("PLACE8_1", "PLACE8_2", "PLACE8_3",
-                        "COUPLE_PLACE8_12", "COUPLE_PLACE8_23", "COUPLE_PLACE8_13"):
+                        "COUPLE_PLACE8_12", "COUPLE_PLACE8_23", "COUPLE_PLACE8_13",
+                        "COUPLE_GAGNANT"):
             if nombre_partants < 8:
                 continue
         elif pari_key in ("PLACE47_1", "PLACE47_2", "COUPLE_PLACE47_12"):
