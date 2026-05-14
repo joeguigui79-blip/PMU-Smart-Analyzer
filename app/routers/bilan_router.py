@@ -7,9 +7,9 @@ Endpoint :
 
 Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Gagnant       : top1 finit 1er
-  - Place         : top1 finit dans top3
+  - Place         : top1 finit dans top3 (≥8 partants) ou top2 (4–7 partants)
   - Couple Gagnant: top2 tous dans top2 (sans ordre)
-  - Couple Place  : top2 tous dans top3
+  - Couple Place  : top2 tous dans top3 (≥8 partants) ou top2 (4–7 partants)
   - Couple Ordre  : top1 est 1er ET top2 est 2ème
   - Tierce        : top3 tous dans top3
   - Quarte+       : top4 tous dans top4
@@ -176,13 +176,15 @@ def _process_course_for_stats(
         for mode in MODES
     }
 
+    nombre_partants = course.nombre_partants or 0
+
     for pari_key in pari_keys:
         if not _pari_in_disponibles(pari_key, course.paris_disponibles):
             continue
 
         for mode in MODES:
             stats[pari_key][mode]["evaluees"] += 1
-            if _simulate_pari(pari_key, sorted_by_mode[mode], positions):
+            if _simulate_pari(pari_key, sorted_by_mode[mode], positions, nombre_partants):
                 stats[pari_key][mode]["gagnes"] += 1
 
     return True
@@ -237,12 +239,16 @@ def _pari_in_disponibles(pari_key: str, paris_disponibles_str: str) -> bool:
     return False
 
 
-def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) -> bool:
+def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict, nombre_partants: int = 0) -> bool:
     """
     Simule si le pari est gagné selon le classement prédit.
     sorted_participants : liste triée par score décroissant (les meilleurs en premier)
     positions : dict num_pmu -> position_arrivee réelle
+    nombre_partants : nombre de partants dans la course (règle PMU place)
     """
+    # Règle PMU : place = top3 si ≥8 partants, top2 si 4-7 partants
+    place_threshold = 3 if nombre_partants >= 8 else 2
+
     if pari_key == "GAGNANT":
         # top1 finit 1er
         if len(sorted_participants) < 1:
@@ -251,21 +257,23 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
         return positions.get(top1) == 1
 
     elif pari_key == "PLACE_1":
-        # top1 finit dans top3
+        # top1 finit dans top3 (≥8 partants) ou top2 (4-7 partants)
         if len(sorted_participants) < 1:
             return False
         pos = positions.get(sorted_participants[0].num_pmu)
-        return pos is not None and pos <= 3
+        return pos is not None and pos <= place_threshold
 
     elif pari_key == "PLACE_2":
-        # top2 finit dans top3
+        # top2 finit dans top3 (≥8 partants) ou top2 (4-7 partants)
         if len(sorted_participants) < 2:
             return False
         pos = positions.get(sorted_participants[1].num_pmu)
-        return pos is not None and pos <= 3
+        return pos is not None and pos <= place_threshold
 
     elif pari_key == "PLACE_3":
-        # top3 finit dans top3
+        # top3 finit dans top3 — uniquement valide si ≥8 partants
+        if nombre_partants < 8:
+            return False
         if len(sorted_participants) < 3:
             return False
         pos = positions.get(sorted_participants[2].num_pmu)
@@ -280,21 +288,25 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
         return top2 == real_top2
 
     elif pari_key == "COUPLE_PLACE_12":
-        # top1 et top2 tous dans top3
+        # top1 et top2 tous dans top3 (≥8 partants) ou top2 (4-7 partants)
         if len(sorted_participants) < 2:
             return False
-        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
-        return {sorted_participants[0].num_pmu, sorted_participants[1].num_pmu}.issubset(real_top3)
+        real_top = {num for num, pos in positions.items() if pos is not None and pos <= place_threshold}
+        return {sorted_participants[0].num_pmu, sorted_participants[1].num_pmu}.issubset(real_top)
 
     elif pari_key == "COUPLE_PLACE_23":
-        # top2 et top3 tous dans top3
+        # top2 et top3 tous dans top3 — uniquement valide si ≥8 partants (implique le 3ème)
+        if nombre_partants < 8:
+            return False
         if len(sorted_participants) < 3:
             return False
         real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
         return {sorted_participants[1].num_pmu, sorted_participants[2].num_pmu}.issubset(real_top3)
 
     elif pari_key == "COUPLE_PLACE_13":
-        # top1 et top3 tous dans top3
+        # top1 et top3 tous dans top3 — uniquement valide si ≥8 partants (implique le 3ème)
+        if nombre_partants < 8:
+            return False
         if len(sorted_participants) < 3:
             return False
         real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}

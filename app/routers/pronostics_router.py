@@ -192,6 +192,12 @@ async def get_pronostics(
                 if not any(alias.upper() in paris_dispo for alias in pari_aliases):
                     continue
 
+            # Règle PMU : PLACE_3 et paris impliquant le 3ème uniquement si ≥8 partants
+            nb_partants = course.nombre_partants or 0
+            if nb_partants > 0 and nb_partants < 8:
+                if pari_key in ("PLACE_3", "COUPLE_PLACE_23", "COUPLE_PLACE_13"):
+                    continue
+
             # Trouver le meilleur mode pour ce pari
             best_mode = None
             best_taux = 0

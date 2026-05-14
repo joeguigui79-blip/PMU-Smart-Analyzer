@@ -453,6 +453,13 @@ async def evaluer_paris_pour_course(db: AsyncSession, course_id: int) -> None:
     if not any(p.position_arrivee is not None for p in participants.values()):
         return  # Pas encore de résultats
 
+    # Récupérer le nombre de partants pour appliquer la règle PMU place
+    course_result = await db.execute(select(Course).where(Course.id == course_id))
+    course_obj = course_result.scalar_one_or_none()
+    nombre_partants = course_obj.nombre_partants if course_obj else 0
+    # Règle PMU : place = top3 si ≥8 partants, top2 si 4-7 partants
+    place_threshold = 3 if nombre_partants >= 8 else 2
+
     # Récupérer les paris en attente
     bets_result = await db.execute(
         select(Bet).where(Bet.course_id == course_id, Bet.statut == "EN_ATTENTE")
@@ -484,7 +491,7 @@ async def evaluer_paris_pour_course(db: AsyncSession, course_id: int) -> None:
                 gain = bet.montant * float(cote) if cote else bet.montant * 2
 
         elif bet.type_pari == "PLACE":
-            if positions and positions[0] <= 3:
+            if positions and positions[0] <= place_threshold:
                 gagne = True
                 cote = chevaux[0].get("cote") if chevaux else None
                 gain = bet.montant * (float(cote) / 4) if cote else bet.montant * 1.5
