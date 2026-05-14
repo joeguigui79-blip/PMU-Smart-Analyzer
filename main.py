@@ -103,6 +103,11 @@ async def serve_index():
     return FileResponse("static/index.html")
 
 
+@app.get("/health", include_in_schema=False)
+async def health_check():
+    return {"status": "ok"}
+
+
 @app.get("/sw.js", include_in_schema=False)
 async def serve_sw():
     """Service Worker servi depuis la racine pour avoir scope '/'."""
