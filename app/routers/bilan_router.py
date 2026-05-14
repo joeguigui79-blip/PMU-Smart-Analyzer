@@ -18,13 +18,13 @@ Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Multi en 5    : top5, au moins 4 dans top4
   - Multi en 6    : top6, au moins 4 dans top4
   - Multi en 7    : top7, au moins 4 dans top4
-  - Trio Ordre    : top3 dans l'ordre exact (1er, 2ème, 3ème)
-  - Trio          : top3 tous dans top3 dans n'importe quel ordre
+  - Trio Ordre    : top3 dans l'ordre exact (1er, 2ème, 3ème) — uniquement 4-7 partants
+  - Trio          : top3 tous dans top3 — uniquement ≥8 partants
   - Super4        : top4 dans l'ordre exact, uniquement si nb_partants entre 5 et 9
 
 Catégories Placé séparées par nombre de partants :
-  - 8 partants ou plus : Place 1, Place 2, Place 3 + Couple Gagnant + Couple Placé 1-2, 2-3, 1-3
-  - 4 à 7 partants     : Place 1, Place 2 seulement + C. Placé 1-2 (ordre exact)
+  - 8 partants ou plus : Place 1, Place 2, Place 3 + Couple Gagnant + Couple Placé 1-2, 2-3, 1-3 + Trio
+  - 4 à 7 partants     : Place 1, Place 2 seulement + C. Placé 1-2 (ordre exact) + Trio Ordre
 
 Seuls les paris présents dans course.paris_disponibles sont comptabilisés.
 Seules les courses avec des position_arrivee renseignées sont prises en compte.
@@ -87,8 +87,8 @@ PARIS_LABELS = {
     "MINI_MULTI_4":     "Mini Multi 4",
     "MINI_MULTI_5":     "Mini Multi 5",
     "MINI_MULTI_6":     "Mini Multi 6",
-    "TRIO_ORDRE":       "Trio Ordre",
-    "TRIO":             "Trio",
+    "TRIO_ORDRE":       "Trio Ordre (4-7 part.)",
+    "TRIO":             "Trio (\u22658 part.)",
     "SUPER4":           "Super4",
 }
 
@@ -131,7 +131,7 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "MINI_MULTI_4":     ["MINI_MULTI", "E_MINI_MULTI"],
     "MINI_MULTI_5":     ["MINI_MULTI", "E_MINI_MULTI"],
     "MINI_MULTI_6":     ["MINI_MULTI", "E_MINI_MULTI"],
-    "TRIO_ORDRE":       ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
+    "TRIO_ORDRE":       ["TRIO_ORDRE", "E_TRIO_ORDRE", "trio_ordre", "TIC_TROIS_ORDRE"],
     "TRIO":             ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
     "SUPER4":           ["SUPER_QUATRE", "E_SUPER_QUATRE"],
 }
@@ -210,10 +210,10 @@ def _process_course_for_stats(
         # Filtrage par nombre de partants pour les clés spécialisées Placé
         if pari_key in ("PLACE8_1", "PLACE8_2", "PLACE8_3",
                         "COUPLE_PLACE8_12", "COUPLE_PLACE8_23", "COUPLE_PLACE8_13",
-                        "COUPLE_GAGNANT"):
+                        "COUPLE_GAGNANT", "TRIO"):
             if nombre_partants < 8:
                 continue
-        elif pari_key in ("PLACE47_1", "PLACE47_2", "COUPLE_PLACE47_12"):
+        elif pari_key in ("PLACE47_1", "PLACE47_2", "COUPLE_PLACE47_12", "TRIO_ORDRE"):
             if nombre_partants < 4 or nombre_partants >= 8:
                 continue
 
@@ -601,7 +601,9 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict, no
         return len(top6 & real_top4) >= 4
 
     elif pari_key == "TRIO_ORDRE":
-        # top3 dans l'ordre exact (1er, 2ème, 3ème)
+        # top3 dans l'ordre exact (1er, 2ème, 3ème) — uniquement 4-7 partants
+        if nombre_partants < 4 or nombre_partants >= 8:
+            return False
         if len(sorted_participants) < 3:
             return False
         return (positions.get(sorted_participants[0].num_pmu) == 1
@@ -609,7 +611,9 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict, no
                 and positions.get(sorted_participants[2].num_pmu) == 3)
 
     elif pari_key == "TRIO":
-        # top3 tous dans top3 dans n'importe quel ordre
+        # top3 tous dans top3 dans n'importe quel ordre — uniquement >=8 partants
+        if nombre_partants < 8:
+            return False
         if len(sorted_participants) < 3:
             return False
         top3 = {sorted_participants[i].num_pmu for i in range(3)}

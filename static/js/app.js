@@ -1828,9 +1828,11 @@ function renderBilanPage(data) {
     "PLACE8_1", "PLACE8_2", "PLACE8_3",
     "COUPLE_GAGNANT",
     "COUPLE_PLACE8_12", "COUPLE_PLACE8_23", "COUPLE_PLACE8_13",
+    "TRIO",
     "__sep_place47__",
     "PLACE47_1", "PLACE47_2",
     "COUPLE_PLACE47_12",
+    "TRIO_ORDRE",
     "__sep_autres_paris__",
     "TIERCE_ORDRE", "TIERCE_DESORDRE",
     "QUARTE_ORDRE", "QUARTE_DESORDRE", "QUARTE_BONUS3",
@@ -1840,8 +1842,8 @@ function renderBilanPage(data) {
     "MULTI_4", "MULTI_5", "MULTI_6", "MULTI_7",
     "__sep_mini_multi__",
     "MINI_MULTI_4", "MINI_MULTI_5", "MINI_MULTI_6",
-    "__sep_autres__",
-    "TRIO_ORDRE", "TRIO", "SUPER4"
+    "__sep_super4__",
+    "SUPER4"
   ];
 
   parisOrder.forEach(function (key) {
@@ -1864,6 +1866,10 @@ function renderBilanPage(data) {
     }
     if (key === "__sep_mini_multi__") {
       html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Mini Multi (&lt;9 partants)</td></tr>';
+      return;
+    }
+    if (key === "__sep_super4__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Super4</td></tr>';
       return;
     }
     if (key === "__sep_autres__") {
