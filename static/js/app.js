@@ -1567,7 +1567,7 @@ function renderPronosticsPage(data) {
     var chevNums = item.prono.chevaux.map(function(ch) { return ch.num_pmu; }).join("-");
     var hasVb = item.prono.chevaux.some(function(ch) { return ch.is_value_bet; });
     var confClass = item.prono.taux >= 50 ? "bilan-green" : item.prono.taux >= 40 ? "bilan-orange" : "bilan-red";
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px ' + (hasVb ? '4' : '0') + 'px;border-bottom:1px solid var(--border)' + (hasVb ? ';background:var(--gold-dim);border-radius:6px;border:1px solid var(--gold)' : '') + '">';
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;' + (hasVb ? 'background:rgba(245,166,35,0.22);border-left:3px solid var(--gold);border-radius:6px;margin-bottom:2px;' : 'border-bottom:1px solid var(--border);') + '">';
     html += '<span class="' + confClass + '" style="font-weight:700;min-width:45px">' + item.prono.taux + '%</span>';
     html += '<span style="font-size:12px;color:var(--text-secondary)">R' + item.course.reunion_num + 'C' + item.course.course_num + '</span>';
     html += '<span style="font-weight:600">' + item.prono.pari_label + '</span>';
@@ -1597,7 +1597,7 @@ function renderPronosticsPage(data) {
         return ch.num_pmu + "-" + ch.nom + vbMark;
       }).join(" + ");
       var confClass = prono.taux >= 50 ? "bilan-green" : prono.taux >= 40 ? "bilan-orange" : "bilan-red";
-      var rowBg = hasVb ? 'background:var(--gold-dim);border-radius:6px;padding:4px 6px;border:1px solid rgba(245,166,35,0.4);' : 'padding:4px 0;';
+      var rowBg = hasVb ? 'background:rgba(245,166,35,0.22);border-left:3px solid var(--gold);border-radius:6px;padding:4px 6px;margin-bottom:2px;' : 'padding:4px 0;border-bottom:1px solid var(--border);';
       html += '<div style="display:flex;align-items:center;gap:8px;' + rowBg + '">';
       html += '<span class="' + confClass + '" style="font-weight:700;min-width:45px;font-size:13px">' + prono.taux + '%</span>';
       html += '<span style="font-weight:600;font-size:13px">' + prono.pari_label + '</span>';
