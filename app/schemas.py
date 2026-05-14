@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 class ParticipantSchema(BaseModel):
     id: int
+    course_id: int = 0
     num_pmu: int
     nom: str
     jockey: str

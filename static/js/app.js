@@ -206,16 +206,45 @@ function renderDashboard(data, stats, accuracy, trend) {
   }
 
   if (data.top_picks && data.top_picks.length > 0) {
+    // Construire un index course_id → {reunion_num, course_num, hippodrome, heure_depart}
+    var _courseIndex = {};
+    if (data.reunions) {
+      data.reunions.forEach(function (r) {
+        r.courses.forEach(function (c) {
+          _courseIndex[c.id] = {
+            reunion_num: r.num_officiel,
+            course_num: c.num_ordre,
+            hippodrome: r.hippodrome_libelle,
+            heure_depart: c.heure_depart
+          };
+        });
+      });
+    }
+
     html += "<div class='section-title'>Top Picks du Jour</div>";
     data.top_picks.forEach(function (p, i) {
       const medal = i === 0 ? "1er" : i === 1 ? "2e" : "3e";
       const vb = p.is_value_bet ? "<span class='badge badge-green' style='margin-left:6px'>VALUE BET</span>" : "";
-      html += "<div class='card' style='padding:12px 16px'>" +
+      var courseInfo = _courseIndex[p.course_id];
+      var courseInfoHtml = "";
+      if (courseInfo) {
+        var heureStr = courseInfo.heure_depart ? H().formatTime(courseInfo.heure_depart) : "";
+        courseInfoHtml = "<div style='font-size:11px;color:var(--text-muted);margin-top:2px'>" +
+          "R" + courseInfo.reunion_num + " C" + courseInfo.course_num +
+          (courseInfo.hippodrome ? " &mdash; " + courseInfo.hippodrome : "") +
+          (heureStr ? " &mdash; " + heureStr : "") +
+          "</div>";
+      }
+      var onclickAttr = courseInfo
+        ? "onclick='navigateToPronosticsAndScroll(" + p.course_id + ")' style='padding:12px 16px;cursor:pointer'"
+        : "style='padding:12px 16px'";
+      html += "<div class='card clickable' " + onclickAttr + ">" +
         "<div style='display:flex;align-items:center;gap:10px'>" +
         "<span style='font-size:22px;min-width:36px;text-align:center;font-weight:800;color:var(--gold)'>" + medal + "</span>" +
         "<div style='flex:1;min-width:0'>" +
         "<div style='font-weight:700;font-size:15px'>" + p.nom + vb + "</div>" +
-        "<div style='font-size:12px;color:var(--text-muted)'>" + (p.jockey || "—") + " · Cote " + H().formatCote(p.cote_actuelle) + "</div>" +
+        courseInfoHtml +
+        "<div style='font-size:12px;color:var(--text-muted);margin-top:2px'>" + (p.jockey || "—") + " · Cote " + H().formatCote(p.cote_actuelle) + "</div>" +
         "</div>" +
         "<div style='text-align:right'>" +
         "<div class='score-label " + H().scoreClass(p.score_global) + "' style='font-size:18px;font-weight:800'>" + Math.round(p.score_global) + "</div>" +
@@ -1198,6 +1227,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
 window.showCourse = showCourse;
 window.showParticipantModal = showParticipantModal;
+
+// ---- Navigation vers pronostics avec scroll sur une course ----
+function navigateToPronosticsAndScroll(courseId) {
+  navigate("pronostics");
+  // Attendre que la page pronostics soit chargée puis scroller vers la course
+  var _maxTries = 20;
+  var _tries = 0;
+  function _tryScroll() {
+    var el = document.getElementById("prono-course-" + courseId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.style.outline = "2px solid var(--gold)";
+      setTimeout(function () { el.style.outline = ""; }, 1500);
+    } else if (_tries < _maxTries) {
+      _tries++;
+      setTimeout(_tryScroll, 200);
+    }
+  }
+  setTimeout(_tryScroll, 300);
+}
+window.navigateToPronosticsAndScroll = navigateToPronosticsAndScroll;
 window.showBetModal = showBetModal;
 window.placeSuggestedBet = placeSuggestedBet;
 window.placeSuggestedBetByKey = placeSuggestedBetByKey;
@@ -1549,7 +1599,7 @@ function renderPronosticsPage(data) {
   // Détail par course
   for (var c = 0; c < data.courses.length; c++) {
     var course = data.courses[c];
-    html += '<div class="stats-card" style="margin-bottom:16px">';
+    html += '<div class="stats-card" id="prono-course-' + course.course_id + '" style="margin-bottom:16px">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
     html += '<h3 style="margin:0;font-size:15px">R' + course.reunion_num + 'C' + course.course_num + ' \u2014 ' + course.libelle + '</h3>';
     html += '<span class="badge badge-gray" style="font-size:11px">' + (course.discipline || "") + '</span>';
