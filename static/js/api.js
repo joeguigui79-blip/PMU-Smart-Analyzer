@@ -45,11 +45,16 @@ async function apiFetch(path, options) {
   try {
     const res = await fetch(BASE + path, options);
     if (res.status === 401) {
-      // Token expired / invalid → show login screen
+      // Token expired / invalid → clear token and show login screen
+      if (window.Auth && window.Auth.clearToken) {
+        window.Auth.clearToken();
+      }
       if (window.Auth && window.Auth.showLoginScreen) {
         window.Auth.showLoginScreen("Session expirée. Reconnectez-vous.");
       }
-      throw new Error("HTTP 401");
+      var authErr = new Error("HTTP 401");
+      authErr.isAuthError = true;
+      throw authErr;
     }
     if (!res.ok) throw new Error("HTTP " + res.status);
     return await res.json();

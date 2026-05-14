@@ -98,17 +98,27 @@
       showLoginScreen();
       return false;
     }
-    // Verify the token is still valid with a lightweight API call
+    // Verify the token is still valid before starting the app
     fetch("/api/dashboard", {
       headers: { "Authorization": "Bearer " + token },
     }).then(function (res) {
       if (res.status === 401) {
+        // Token invalid (e.g. old UUID token after HMAC migration)
         clearToken();
         showLoginScreen();
+        return;
+      }
+      // Token valid → start the app
+      if (typeof window._appInit === "function") {
+        window._appInit();
       }
     }).catch(function () {
-      // Network error — still show app (offline mode)
+      // Network error — still start the app (offline mode)
+      if (typeof window._appInit === "function") {
+        window._appInit();
+      }
     });
+    // Return true to signal that auth check is in progress (app will start after check)
     return true;
   }
 
@@ -123,6 +133,7 @@
   /* ---- Expose globally ---- */
   window.Auth = {
     getToken: getToken,
+    clearToken: clearToken,
     logout: logout,
     boot: boot,
     showLoginScreen: showLoginScreen,

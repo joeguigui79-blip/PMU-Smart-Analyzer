@@ -175,6 +175,7 @@ async function loadDashboard() {
     renderDashboard(data, stats, accuracy, trend);
     _markPageLoaded("dashboard");
   } catch (e) {
+    if (e && e.isAuthError) return; // 401 → login screen already shown by apiFetch
     console.error("Dashboard error:", e);
     content.innerHTML = "<div class='empty-state'><div class='empty-icon'>⚠️</div><div class='empty-title'>Impossible de charger les données</div><p style='color:var(--text-muted);font-size:13px'>Vérifiez votre connexion internet</p></div>";
     showToast("Erreur de chargement", true);
@@ -383,6 +384,7 @@ async function loadCourses() {
     // Restaurer la position de scroll si applicable
     setTimeout(function() { window.scrollTo(0, _coursesScrollPos); }, 50);
   } catch (e) {
+    if (e && e.isAuthError) return; // 401 → login screen already shown by apiFetch
     content.innerHTML = "<div class='empty-state'><div class='empty-icon'>⚠️</div><div class='empty-title'>Erreur de chargement</div></div>";
     showToast("Erreur de chargement", true);
   }
@@ -421,6 +423,7 @@ async function showCourse(courseId) {
     const course = await API.course(courseId);
     renderCourseDetail(course, null);
   } catch (e) {
+    if (e && e.isAuthError) return; // 401 → login screen already shown by apiFetch
     content.innerHTML = "<div class='empty-state'><div class='empty-icon'>⚠️</div><div class='empty-title'>Erreur de chargement</div></div>";
     showToast("Impossible de charger cette course", true);
   }
@@ -1218,9 +1221,10 @@ window._appInit = _appInit;
 
 document.addEventListener("DOMContentLoaded", function () {
   // Check authentication before starting the app
+  // boot() now handles _appInit() call itself after token verification
   if (window.Auth && window.Auth.boot) {
-    var hasToken = window.Auth.boot();
-    if (!hasToken) return; // login screen shown by boot()
+    window.Auth.boot(); // boot handles _appInit() or showLoginScreen() internally
+    return;
   }
   _appInit();
 });
@@ -1254,6 +1258,7 @@ async function loadStatsPage() {
     container.innerHTML = renderStatsPage(scoringData, calibData);
     _markPageLoaded("stats");
   } catch (e) {
+    if (e && e.isAuthError) return; // 401 → login screen already shown by apiFetch
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement des statistiques.<br>' + (e.message || "") + "</div>";
   }
 }
@@ -1506,6 +1511,7 @@ async function loadPronosticsPage(seuil) {
     container.innerHTML = renderPronosticsPage(data);
     _markPageLoaded("pronostics");
   } catch (e) {
+    if (e && e.isAuthError) return; // 401 → login screen already shown by apiFetch
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement des pronostics.<br>' + (e.message || "") + '</div>';
   }
 }
@@ -1633,6 +1639,7 @@ async function loadBilanPage(periode, discipline) {
     container.innerHTML = renderBilanPage(_bilanData);
     _markPageLoaded("bilan");
   } catch (e) {
+    if (e && e.isAuthError) return; // 401 → login screen already shown by apiFetch
     container.innerHTML = '<div class="stats-error">Erreur lors du chargement du bilan.<br>' + (e.message || "") + "</div>";
   }
 }
