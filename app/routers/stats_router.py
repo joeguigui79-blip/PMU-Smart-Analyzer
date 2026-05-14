@@ -7,7 +7,7 @@ Endpoints :
   POST /api/calibrate         — Force un recalcul des poids auto
 """
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -18,6 +18,7 @@ from app.scoring import _normalize_discipline
 from app.config import SCORING_WEIGHTS_DISCIPLINE
 from app.calibration import calibrate_and_store, get_calibration_status, MIN_COURSES_PAR_DISCIPLINE, MIN_COURSES_DEFAULT
 from app.service import refresh_programme_statuts
+from app.cache import cache, TTL_STATS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["stats"])
@@ -99,11 +100,19 @@ async def _get_top1_rates_by_disc(db: AsyncSession) -> dict[str, dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/api/stats/scoring")
-async def stats_scoring(db: AsyncSession = Depends(get_db)):
+async def stats_scoring(nocache: int = Query(default=0), db: AsyncSession = Depends(get_db)):
     """
     Taux de réussite Top-1 exact (Expert / Auto / Sans-cote) par discipline.
     Inclut le mode recommandé (meilleur taux top-1) pour chaque discipline.
     """
+    cache_key = "stats:scoring"
+
+    if not nocache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.debug("Cache HIT: %s", cache_key)
+            return cached
+
     # Rattraper les arrivées manquantes avant de calculer les stats
     try:
         await refresh_programme_statuts(db)
@@ -148,7 +157,7 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
     # Corrélation par critère (top 10 critères les plus pondérés)
     critere_perf = await _compute_critere_performance(db)
 
-    return {
+    response = {
         "disciplines":        result,
         "total_courses":      sum(r["nb_courses"] for r in rates_by_disc.values()),
         "min_courses_required": MIN_COURSES_PAR_DISCIPLINE,
@@ -156,6 +165,9 @@ async def stats_scoring(db: AsyncSession = Depends(get_db)):
         "critere_performance": critere_perf,
         "discipline_summary": discipline_summary,
     }
+    cache.set(cache_key, response, ttl=TTL_STATS)
+    logger.debug("Cache SET: %s (TTL=%ds)", cache_key, TTL_STATS)
+    return response
 
 
 async def _compute_evolution(db: AsyncSession) -> dict:
@@ -253,12 +265,20 @@ async def _compute_critere_performance(db: AsyncSession) -> list[dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/api/stats/calibration")
-async def stats_calibration(db: AsyncSession = Depends(get_db)):
+async def stats_calibration(nocache: int = Query(default=0), db: AsyncSession = Depends(get_db)):
     """
     Retourne les poids auto-calibrés actuels par discipline + date dernière calibration.
     Le mode actif est désormais basé sur le meilleur taux top-1 observé (pas seulement
     la présence d'une calibration auto).
     """
+    cache_key = "stats:calibration"
+
+    if not nocache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.debug("Cache HIT: %s", cache_key)
+            return cached
+
     status = await get_calibration_status(db)
 
     # Taux top-1 par discipline (pour choisir le mode actif réel)
@@ -307,11 +327,14 @@ async def stats_calibration(db: AsyncSession = Depends(get_db)):
             "last_updated":          last_updated,
         }
 
-    return {
+    calib_response = {
         "calibrated":          status.get("calibrated", False),
         "last_updated_global": status.get("last_updated"),
         "disciplines":         disciplines_info,
     }
+    cache.set(cache_key, calib_response, ttl=TTL_STATS)
+    logger.debug("Cache SET: %s (TTL=%ds)", cache_key, TTL_STATS)
+    return calib_response
 
 
 # ─────────────────────────────────────────────────────────────────────────────

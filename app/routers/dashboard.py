@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -10,19 +10,28 @@ from app.models import Reunion, Course, Participant, DailyStats
 from app.schemas import DashboardSchema, ReunionSchema, ParticipantSchema, DailyStatsSchema
 from app.service import load_programme_today
 from app.config import today_str
+from app.cache import cache, TTL_DASHBOARD, TTL_STATS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
 
 @router.get("/dashboard", response_model=DashboardSchema)
-async def get_dashboard(db: AsyncSession = Depends(get_db)):
+async def get_dashboard(nocache: int = Query(default=0), db: AsyncSession = Depends(get_db)):
     """Résumé du jour : stats globales et top recommandations."""
+    date_str = today_str()
+    cache_key = f"dashboard:{date_str}"
+
+    if not nocache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.debug("Cache HIT: %s", cache_key)
+            return cached
+
     try:
         await load_programme_today(db)
     except Exception as exc:
         logger.warning("load_programme_today failed (non-blocking): %s", exc)
-    date_str = today_str()
 
     # Réunions avec courses
     result = await db.execute(
@@ -57,7 +66,7 @@ async def get_dashboard(db: AsyncSession = Depends(get_db)):
     )
     top_picks = top_result.scalars().all()
 
-    return DashboardSchema(
+    response = DashboardSchema(
         date=date_str,
         nb_reunions=nb_reunions,
         nb_courses=nb_courses,
@@ -65,12 +74,22 @@ async def get_dashboard(db: AsyncSession = Depends(get_db)):
         top_picks=[ParticipantSchema.model_validate(p) for p in top_picks],
         reunions=[ReunionSchema.model_validate(r) for r in reunions],
     )
+    cache.set(cache_key, response, ttl=TTL_DASHBOARD)
+    logger.debug("Cache SET: %s (TTL=%ds)", cache_key, TTL_DASHBOARD)
+    return response
 
 
 @router.get("/stats", response_model=list[DailyStatsSchema])
-async def get_stats(db: AsyncSession = Depends(get_db)):
+async def get_stats(nocache: int = Query(default=0), db: AsyncSession = Depends(get_db)):
     """Statistiques des 7 derniers jours — 3 requêtes groupées au lieu de 21."""
     today = datetime.utcnow().date()
+    cache_key = f"stats:{today.isoformat()}"
+
+    if not nocache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.debug("Cache HIT: %s", cache_key)
+            return cached
 
     # Préparer les 7 jours : date ISO (clé de sortie) et DDMMYYYY (filtre DB)
     date_range = []
@@ -111,7 +130,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     fin_by_date: dict[str, int] = {row[0]: row[1] for row in fin_rows}
 
     # Assembler les résultats
-    return [
+    response = [
         DailyStatsSchema(
             date=day_str,
             nb_courses=courses_by_date.get(ddmmyyyy, 0),
@@ -121,3 +140,6 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         )
         for day_str, ddmmyyyy in date_range
     ]
+    cache.set(cache_key, response, ttl=TTL_STATS)
+    logger.debug("Cache SET: %s (TTL=%ds)", cache_key, TTL_STATS)
+    return response

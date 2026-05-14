@@ -39,6 +39,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import Course, Participant, Reunion
+from app.cache import cache, TTL_BILAN
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["bilan"])
@@ -509,12 +510,21 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict) ->
 async def get_bilan(
     periode: Optional[str] = Query(default="all", description="today|7days|30days|month|all"),
     discipline: Optional[str] = Query(default="all", description="all|PLAT|TROT_MONTE|TROT_ATTELE|HAIE"),
+    nocache: int = Query(default=0),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Retourne le bilan de backtesting pour chaque type de pari et chaque mode de scoring.
     Filtre par période et par discipline.
     """
+    cache_key = f"bilan:{periode}:{discipline}"
+
+    if not nocache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.debug("Cache HIT: %s", cache_key)
+            return cached
+
     paris_tz = ZoneInfo("Europe/Paris")
     now = datetime.now(paris_tz)
     date_from: Optional[str] = None
@@ -577,8 +587,11 @@ async def get_bilan(
             })
         evolution_result[pari_key] = series
 
-    return {
+    result_data = {
         "total_courses": total_courses_with_results,
         "paris": paris_result,
         "evolution": evolution_result,
     }
+    cache.set(cache_key, result_data, ttl=TTL_BILAN)
+    logger.debug("Cache SET: %s (TTL=%ds)", cache_key, TTL_BILAN)
+    return result_data

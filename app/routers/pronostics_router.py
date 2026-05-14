@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models import Course, Participant, Reunion
 from app.config import today_str
 from app.routers.bilan_router import get_bilan, PARIS_ALIASES
+from app.cache import cache, TTL_PRONOSTICS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["pronostics"])
@@ -115,12 +116,22 @@ def _get_score_for_mode(p, mode: str) -> float:
 @router.get("/pronostics")
 async def get_pronostics(
     seuil: int = Query(default=SEUIL_CONFIANCE, description="Seuil minimum de confiance en %"),
+    nocache: int = Query(default=0),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Pour chaque course du jour (non terminée, avec participants chargés),
     retourne les paris recommandés basés sur les taux historiques du bilan.
     """
+    date = today_str()
+    cache_key = f"pronostics:{date}:{seuil}"
+
+    if not nocache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.debug("Cache HIT: %s", cache_key)
+            return cached
+
     # 1. Récupérer le bilan global (toutes périodes) pour chaque discipline
     bilan_all = await get_bilan(periode="all", discipline="all", db=db)
     # Aussi par discipline
@@ -257,9 +268,12 @@ async def get_pronostics(
                 "pronostics": course_pronostics,
             })
 
-    return {
+    result_data = {
         "date": date,
         "seuil_confiance": seuil,
         "nb_courses": len(recommendations),
         "courses": recommendations,
     }
+    cache.set(cache_key, result_data, ttl=TTL_PRONOSTICS)
+    logger.debug("Cache SET: %s (TTL=%ds)", cache_key, TTL_PRONOSTICS)
+    return result_data

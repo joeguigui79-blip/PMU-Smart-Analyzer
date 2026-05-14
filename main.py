@@ -94,6 +94,28 @@ app.include_router(bilan_router.router)
 from app.routers import pronostics_router
 app.include_router(pronostics_router.router)
 
+# ---- Endpoint de gestion du cache ----
+from app.cache import cache as _cache
+
+@app.get("/api/cache/stats", include_in_schema=True, tags=["cache"])
+async def cache_stats():
+    """Retourne les statistiques du cache en mémoire."""
+    return _cache.stats()
+
+
+@app.post("/api/cache/clear", include_in_schema=True, tags=["cache"])
+async def cache_clear():
+    """Vide l'intégralité du cache en mémoire. Protégé par auth middleware."""
+    count = _cache.clear()
+    return {"cleared": count, "message": f"{count} entrées supprimées du cache"}
+
+
+@app.post("/api/cache/evict", include_in_schema=True, tags=["cache"])
+async def cache_evict_expired():
+    """Supprime uniquement les entrées expirées du cache."""
+    count = _cache.evict_expired()
+    return {"evicted": count, "message": f"{count} entrées expirées supprimées"}
+
 # Servir les fichiers statiques
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

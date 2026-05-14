@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -14,14 +14,22 @@ from app.service import load_programme_today, load_participants_for_course, fetc
 from app.scoring import calculer_scores
 from app.pmu_client import pmu_client
 from app.config import today_str
+from app.cache import cache, TTL_COURSES_DU_JOUR, TTL_REUNIONS
 
 router = APIRouter(prefix="/api", tags=["courses"])
 
 
 @router.get("/reunions", response_model=list[ReunionSchema])
-async def list_reunions(db: AsyncSession = Depends(get_db)):
+async def list_reunions(nocache: int = Query(default=0), db: AsyncSession = Depends(get_db)):
     """Liste toutes les réunions du jour avec leurs courses."""
     date_str = today_str()
+    cache_key = f"reunions:{date_str}"
+
+    if not nocache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     result = await db.execute(
         select(Reunion)
         .where(Reunion.date_str == date_str)
@@ -29,13 +37,22 @@ async def list_reunions(db: AsyncSession = Depends(get_db)):
         .order_by(Reunion.num_officiel)
     )
     reunions = result.scalars().all()
-    return reunions
+    response = [ReunionSchema.model_validate(r) for r in reunions]
+    cache.set(cache_key, response, ttl=TTL_REUNIONS)
+    return response
 
 
 @router.get("/courses", response_model=list[CourseSchema])
-async def list_courses(db: AsyncSession = Depends(get_db)):
+async def list_courses(nocache: int = Query(default=0), db: AsyncSession = Depends(get_db)):
     """Liste toutes les courses du jour."""
     date_str = today_str()
+    cache_key = f"courses:{date_str}"
+
+    if not nocache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     result = await db.execute(
         select(Course)
         .join(Reunion)
@@ -43,7 +60,9 @@ async def list_courses(db: AsyncSession = Depends(get_db)):
         .order_by(Reunion.num_officiel, Course.num_externe)
     )
     courses = result.scalars().all()
-    return courses
+    response = [CourseSchema.model_validate(c) for c in courses]
+    cache.set(cache_key, response, ttl=TTL_COURSES_DU_JOUR)
+    return response
 
 
 @router.post("/refresh-programme", status_code=200)
@@ -51,7 +70,13 @@ async def refresh_programme_data(db: AsyncSession = Depends(get_db)):
     """Charge le programme PMU du jour et met à jour les statuts."""
     loaded = await load_programme_today(db)
     await refresh_programme_statuts(db)
-    return {"success": True, "loaded": loaded, "date": today_str()}
+    # Invalider les entrées cache liées au programme du jour
+    date_str = today_str()
+    cache.delete_prefix(f"reunions:{date_str}")
+    cache.delete_prefix(f"courses:{date_str}")
+    cache.delete_prefix(f"dashboard:{date_str}")
+    cache.delete_prefix(f"pronostics:{date_str}")
+    return {"success": True, "loaded": loaded, "date": date_str}
 
 
 @router.get("/courses/{course_id}", response_model=CourseDetailSchema)
@@ -242,6 +267,12 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
     # Passe supplémentaire : récupérer les arrivées des courses TERMINE sans positions
     # (cas où le statut TERMINE a été enregistré avant que l'API PMU rende l'arrivée disponible)
     arrivees_recuperees = await recuperer_arrivees_manquantes(db)
+
+    # Invalider les entrées cache liées au programme du jour
+    cache.delete_prefix(f"reunions:{date_str}")
+    cache.delete_prefix(f"courses:{date_str}")
+    cache.delete_prefix(f"dashboard:{date_str}")
+    cache.delete_prefix(f"pronostics:{date_str}")
 
     return {"success": True, "loaded": True, "date": date_str, "arrivees_recuperees": arrivees_recuperees}
 
