@@ -9,7 +9,7 @@ Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Gagnant       : top1 finit 1er
   - Place         : top1 finit dans top3 (≥8 partants) ou top2 (4–7 partants)
   - Couple Gagnant: top2 tous dans top2 (sans ordre)
-  - Couple Place  : top2 tous dans top3 (≥8 partants) ou top2 (4–7 partants)
+  - Couple Place  : top2 tous dans top3 (≥8 partants) ou dans l'ordre exact (4–7 partants, couple place = couple ordre)
   - Couple Ordre  : top1 est 1er ET top2 est 2ème
   - Tierce        : top3 tous dans top3
   - Quarte+       : top4 tous dans top4
@@ -62,7 +62,7 @@ PARIS_LABELS = {
     # Placé 4-7 partants : top2 uniquement
     "PLACE47_1":            "Plac\u00e9 1",
     "PLACE47_2":            "Plac\u00e9 2",
-    "COUPLE_PLACE47_12":    "C. Plac\u00e9 1-2",
+    "COUPLE_PLACE47_12":    "C. Plac\u00e9 1-2 (ordre)",
     # Placé générique (toutes courses, conservé pour compatibilité / pronostics)
     "PLACE_1":              "Plac\u00e9 1",
     "PLACE_2":              "Plac\u00e9 2",
@@ -107,7 +107,7 @@ PARIS_ALIASES: dict[str, list[str]] = {
     # Placé 4-7 partants
     "PLACE47_1":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "PLACE47_2":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
-    "COUPLE_PLACE47_12":    ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    "COUPLE_PLACE47_12":    ["COUPLE_ORDRE", "E_COUPLE_ORDRE", "couple_ordre", "COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     # Placé générique
     "PLACE_1":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "PLACE_2":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
@@ -360,12 +360,14 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict, no
         return pos is not None and pos <= 2
 
     elif pari_key == "COUPLE_PLACE47_12":
+        # Avec seulement 2 places dispo, couple place = couple ordre : top1 est 1er ET top2 est 2ème
         if nombre_partants < 4 or nombre_partants >= 8:
             return False
         if len(sorted_participants) < 2:
             return False
-        real_top2 = {num for num, pos in positions.items() if pos is not None and pos <= 2}
-        return {sorted_participants[0].num_pmu, sorted_participants[1].num_pmu}.issubset(real_top2)
+        top1 = sorted_participants[0].num_pmu
+        top2 = sorted_participants[1].num_pmu
+        return positions.get(top1) == 1 and positions.get(top2) == 2
 
     elif pari_key == "PLACE_1":
         # top1 finit dans top3 (≥8 partants) ou top2 (4-7 partants)
