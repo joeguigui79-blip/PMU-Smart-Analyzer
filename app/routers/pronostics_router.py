@@ -242,9 +242,18 @@ async def get_pronostics(
             if not chevaux or len(chevaux) < (1 if "PLACE" in pari_key and pari_key.startswith("PLACE") else nb_chevaux):
                 continue
 
+            # Label contextuel : préciser le type de Placé selon le nombre de partants
+            pari_label = PARIS_LABELS.get(pari_key, pari_key)
+            if pari_key in ("PLACE_1", "PLACE_2", "PLACE_3",
+                            "COUPLE_PLACE_12", "COUPLE_PLACE_23", "COUPLE_PLACE_13"):
+                if nb_partants >= 8:
+                    pari_label += " (8+ pts, top 3)"
+                elif nb_partants >= 4:
+                    pari_label += " (4-7 pts, top 2)"
+
             course_pronostics.append({
                 "pari": pari_key,
-                "pari_label": PARIS_LABELS.get(pari_key, pari_key),
+                "pari_label": pari_label,
                 "mode": best_mode,
                 "mode_label": MODE_LABELS[best_mode],
                 "taux": round(best_taux, 1),
@@ -271,6 +280,7 @@ async def get_pronostics(
                 "discipline": course.discipline,
                 "hippodrome": reunion.hippodrome_libelle,
                 "heure_depart": course.heure_depart.isoformat() if course.heure_depart else None,
+                "nombre_partants": course.nombre_partants or 0,
                 "pronostics": course_pronostics,
             })
 

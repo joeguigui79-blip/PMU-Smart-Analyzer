@@ -23,6 +23,10 @@ Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Trio          : top3 tous dans top3 dans n'importe quel ordre
   - Super4        : top4 dans l'ordre exact, uniquement si nb_partants entre 5 et 9
 
+Catégories Placé séparées par nombre de partants :
+  - 8 partants ou plus : Place 1, Place 2, Place 3 + Couple Placé 1-2, 2-3, 1-3
+  - 4 à 7 partants     : Place 1, Place 2 seulement (pas de Place 3 ni couples impliquant le 3ème)
+
 Seuls les paris présents dans course.paris_disponibles sont comptabilisés.
 Seules les courses avec des position_arrivee renseignées sont prises en compte.
 """
@@ -47,15 +51,27 @@ router = APIRouter(tags=["bilan"])
 # Mapping type de pari → clé API normalisée
 # La clé correspond aux valeurs potentielles dans paris_disponibles
 PARIS_LABELS = {
-    "GAGNANT":          "Gagnant",
-    "PLACE_1":          "Plac\u00e9 1",
-    "PLACE_2":          "Plac\u00e9 2",
-    "PLACE_3":          "Plac\u00e9 3",
-    "COUPLE_GAGNANT":   "Coupl\u00e9 Gagnant",
-    "COUPLE_PLACE_12":  "C. Plac\u00e9 1-2",
-    "COUPLE_PLACE_23":  "C. Plac\u00e9 2-3",
-    "COUPLE_PLACE_13":  "C. Plac\u00e9 1-3",
-    "COUPLE_ORDRE":     "Coupl\u00e9 Ordre",
+    "GAGNANT":              "Gagnant",
+    # Placé ≥8 partants : top3 éligible
+    "PLACE8_1":             "Plac\u00e9 1",
+    "PLACE8_2":             "Plac\u00e9 2",
+    "PLACE8_3":             "Plac\u00e9 3",
+    "COUPLE_PLACE8_12":     "C. Plac\u00e9 1-2",
+    "COUPLE_PLACE8_23":     "C. Plac\u00e9 2-3",
+    "COUPLE_PLACE8_13":     "C. Plac\u00e9 1-3",
+    # Placé 4-7 partants : top2 uniquement
+    "PLACE47_1":            "Plac\u00e9 1",
+    "PLACE47_2":            "Plac\u00e9 2",
+    "COUPLE_PLACE47_12":    "C. Plac\u00e9 1-2",
+    # Placé générique (toutes courses, conservé pour compatibilité / pronostics)
+    "PLACE_1":              "Plac\u00e9 1",
+    "PLACE_2":              "Plac\u00e9 2",
+    "PLACE_3":              "Plac\u00e9 3",
+    "COUPLE_GAGNANT":       "Coupl\u00e9 Gagnant",
+    "COUPLE_PLACE_12":      "C. Plac\u00e9 1-2",
+    "COUPLE_PLACE_23":      "C. Plac\u00e9 2-3",
+    "COUPLE_PLACE_13":      "C. Plac\u00e9 1-3",
+    "COUPLE_ORDRE":         "Coupl\u00e9 Ordre",
     "TIERCE_ORDRE":     "Tierc\u00e9 Ordre",
     "TIERCE_DESORDRE":  "Tierc\u00e9 D\u00e9sordre",
     "QUARTE_ORDRE":     "Quart\u00e9+ Ordre",
@@ -80,7 +96,19 @@ PARIS_LABELS = {
 
 # Alias supplémentaires pour la correspondance avec paris_disponibles
 PARIS_ALIASES: dict[str, list[str]] = {
-    "GAGNANT":          ["SIMPLE_GAGNANT", "E_SIMPLE_GAGNANT", "GAGNANT", "gagnant"],
+    "GAGNANT":              ["SIMPLE_GAGNANT", "E_SIMPLE_GAGNANT", "GAGNANT", "gagnant"],
+    # Placé ≥8 partants
+    "PLACE8_1":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "PLACE8_2":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "PLACE8_3":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "COUPLE_PLACE8_12":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    "COUPLE_PLACE8_23":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    "COUPLE_PLACE8_13":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    # Placé 4-7 partants
+    "PLACE47_1":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "PLACE47_2":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "COUPLE_PLACE47_12":    ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
+    # Placé générique
     "PLACE_1":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "PLACE_2":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "PLACE_3":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
@@ -182,6 +210,15 @@ def _process_course_for_stats(
         if not _pari_in_disponibles(pari_key, course.paris_disponibles):
             continue
 
+        # Filtrage par nombre de partants pour les clés spécialisées Placé
+        if pari_key in ("PLACE8_1", "PLACE8_2", "PLACE8_3",
+                        "COUPLE_PLACE8_12", "COUPLE_PLACE8_23", "COUPLE_PLACE8_13"):
+            if nombre_partants < 8:
+                continue
+        elif pari_key in ("PLACE47_1", "PLACE47_2", "COUPLE_PLACE47_12"):
+            if nombre_partants < 4 or nombre_partants >= 8:
+                continue
+
         for mode in MODES:
             stats[pari_key][mode]["evaluees"] += 1
             if _simulate_pari(pari_key, sorted_by_mode[mode], positions, nombre_partants):
@@ -255,6 +292,80 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict, no
             return False
         top1 = sorted_participants[0].num_pmu
         return positions.get(top1) == 1
+
+    # ---- Placé ≥8 partants : top3 éligible ----
+    elif pari_key == "PLACE8_1":
+        if nombre_partants < 8:
+            return False
+        if len(sorted_participants) < 1:
+            return False
+        pos = positions.get(sorted_participants[0].num_pmu)
+        return pos is not None and pos <= 3
+
+    elif pari_key == "PLACE8_2":
+        if nombre_partants < 8:
+            return False
+        if len(sorted_participants) < 2:
+            return False
+        pos = positions.get(sorted_participants[1].num_pmu)
+        return pos is not None and pos <= 3
+
+    elif pari_key == "PLACE8_3":
+        if nombre_partants < 8:
+            return False
+        if len(sorted_participants) < 3:
+            return False
+        pos = positions.get(sorted_participants[2].num_pmu)
+        return pos is not None and pos <= 3
+
+    elif pari_key == "COUPLE_PLACE8_12":
+        if nombre_partants < 8:
+            return False
+        if len(sorted_participants) < 2:
+            return False
+        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
+        return {sorted_participants[0].num_pmu, sorted_participants[1].num_pmu}.issubset(real_top3)
+
+    elif pari_key == "COUPLE_PLACE8_23":
+        if nombre_partants < 8:
+            return False
+        if len(sorted_participants) < 3:
+            return False
+        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
+        return {sorted_participants[1].num_pmu, sorted_participants[2].num_pmu}.issubset(real_top3)
+
+    elif pari_key == "COUPLE_PLACE8_13":
+        if nombre_partants < 8:
+            return False
+        if len(sorted_participants) < 3:
+            return False
+        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
+        return {sorted_participants[0].num_pmu, sorted_participants[2].num_pmu}.issubset(real_top3)
+
+    # ---- Placé 4-7 partants : top2 uniquement ----
+    elif pari_key == "PLACE47_1":
+        if nombre_partants < 4 or nombre_partants >= 8:
+            return False
+        if len(sorted_participants) < 1:
+            return False
+        pos = positions.get(sorted_participants[0].num_pmu)
+        return pos is not None and pos <= 2
+
+    elif pari_key == "PLACE47_2":
+        if nombre_partants < 4 or nombre_partants >= 8:
+            return False
+        if len(sorted_participants) < 2:
+            return False
+        pos = positions.get(sorted_participants[1].num_pmu)
+        return pos is not None and pos <= 2
+
+    elif pari_key == "COUPLE_PLACE47_12":
+        if nombre_partants < 4 or nombre_partants >= 8:
+            return False
+        if len(sorted_participants) < 2:
+            return False
+        real_top2 = {num for num, pos in positions.items() if pos is not None and pos <= 2}
+        return {sorted_participants[0].num_pmu, sorted_participants[1].num_pmu}.issubset(real_top2)
 
     elif pari_key == "PLACE_1":
         # top1 finit dans top3 (≥8 partants) ou top2 (4-7 partants)

@@ -1593,7 +1593,8 @@ function renderPronosticsPage(data) {
     html += '<span class="badge badge-gray" style="font-size:11px">' + (course.discipline || "") + '</span>';
     html += '</div>';
     var heureStr = course.heure_depart ? H().formatTime(course.heure_depart) : "";
-    html += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">' + (course.hippodrome || "") + (heureStr ? ' &mdash; ' + heureStr : '') + '</div>';
+    var partantsStr = course.nombre_partants ? ' &mdash; ' + course.nombre_partants + ' partants' : "";
+    html += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">' + (course.hippodrome || "") + (heureStr ? ' &mdash; ' + heureStr : '') + partantsStr + '</div>';
 
     for (var p = 0; p < course.pronostics.length; p++) {
       var prono = course.pronostics[p];
@@ -1822,8 +1823,15 @@ function renderBilanPage(data) {
   html += '<tbody>';
 
   var parisOrder = [
-    "GAGNANT", "PLACE_1", "PLACE_2", "PLACE_3",
-    "COUPLE_GAGNANT", "COUPLE_PLACE_12", "COUPLE_PLACE_23", "COUPLE_PLACE_13", "COUPLE_ORDRE",
+    "GAGNANT",
+    "__sep_place8__",
+    "PLACE8_1", "PLACE8_2", "PLACE8_3",
+    "COUPLE_PLACE8_12", "COUPLE_PLACE8_23", "COUPLE_PLACE8_13",
+    "__sep_place47__",
+    "PLACE47_1", "PLACE47_2",
+    "COUPLE_PLACE47_12",
+    "__sep_autres_paris__",
+    "COUPLE_GAGNANT", "COUPLE_ORDRE",
     "TIERCE_ORDRE", "TIERCE_DESORDRE",
     "QUARTE_ORDRE", "QUARTE_DESORDRE", "QUARTE_BONUS3",
     "QUINTE_ORDRE", "QUINTE_DESORDRE", "QUINTE_BONUS4", "QUINTE_BONUS3",
@@ -1838,6 +1846,18 @@ function renderBilanPage(data) {
 
   parisOrder.forEach(function (key) {
     // Lignes séparatrices avec titre de groupe
+    if (key === "__sep_place8__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Plac\u00e9 \u2014 8 partants ou plus (top 3)</td></tr>';
+      return;
+    }
+    if (key === "__sep_place47__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Plac\u00e9 \u2014 4 \u00e0 7 partants (top 2 seulement)</td></tr>';
+      return;
+    }
+    if (key === "__sep_autres_paris__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Autres paris</td></tr>';
+      return;
+    }
     if (key === "__sep_multi_classique__") {
       html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Multi classique (9+ partants)</td></tr>';
       return;
@@ -1847,7 +1867,7 @@ function renderBilanPage(data) {
       return;
     }
     if (key === "__sep_autres__") {
-      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Autres paris</td></tr>';
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Trio / Super4</td></tr>';
       return;
     }
 
