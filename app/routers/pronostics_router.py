@@ -55,6 +55,7 @@ CHEVAUX_PAR_PARI = {
     "TRIO_ORDRE": 3,
     "TRIO": 3,
     "SUPER4": 4,
+    "PICK5": 5,
     "QUARTE_DERIVED": 4,
     "TIERCE_DERIVED_FROM_QUINTE": 3,
     "TIERCE_DERIVED_FROM_QUARTE": 3,
@@ -91,6 +92,7 @@ PARIS_LABELS = {
     "TRIO_ORDRE": "Trio Ordre",
     "TRIO": "Trio",
     "SUPER4": "Super 4",
+    "PICK5": "Pick 5",
     "QUARTE_DERIVED": "Quart\u00e9+ (sur Quint\u00e9+)",
     "TIERCE_DERIVED_FROM_QUINTE": "Tierc\u00e9 (sur Quint\u00e9+)",
     "TIERCE_DERIVED_FROM_QUARTE": "Tierc\u00e9 (sur Quart\u00e9+)",
@@ -203,6 +205,10 @@ async def get_pronostics(
             if nb_partants > 0 and nb_partants < 8:
                 if pari_key in ("PLACE_3", "COUPLE_PLACE_23", "COUPLE_PLACE_13"):
                     continue
+
+            # Règle PMU : Pick 5 uniquement si ≥14 partants
+            if pari_key == "PICK5" and nb_partants < 14:
+                continue
 
             # Trouver le meilleur mode pour ce pari
             best_mode = None

@@ -21,6 +21,7 @@ Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Trio Ordre    : top3 dans l'ordre exact (1er, 2ème, 3ème) — uniquement 4-7 partants
   - Trio          : top3 tous dans top3 — uniquement ≥8 partants
   - Super4        : top4 dans l'ordre exact, uniquement si nb_partants entre 5 et 9
+  - Pick 5        : top5 dans n'importe quel ordre — uniquement ≥14 partants
 
 Catégories Placé séparées par nombre de partants :
   - 8 partants ou plus : Place 1, Place 2, Place 3 + Couple Gagnant + Couple Placé 1-2, 2-3, 1-3 + Trio
@@ -90,6 +91,7 @@ PARIS_LABELS = {
     "TRIO_ORDRE":       "Trio Ordre (4-7 part.)",
     "TRIO":             "Trio (\u22658 part.)",
     "SUPER4":           "Super4",
+    "PICK5":            "Pick 5",
 }
 
 # Alias supplémentaires pour la correspondance avec paris_disponibles
@@ -134,6 +136,7 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "TRIO_ORDRE":       ["TRIO_ORDRE", "E_TRIO_ORDRE", "trio_ordre", "TIC_TROIS_ORDRE"],
     "TRIO":             ["TRIO", "E_TRIO", "trio", "TIC_TROIS"],
     "SUPER4":           ["SUPER_QUATRE", "E_SUPER_QUATRE"],
+    "PICK5":            ["PICK5", "E_PICK5", "pick5"],
 }
 
 MODES = ["auto", "expert", "sans_cote"]
@@ -215,6 +218,9 @@ def _process_course_for_stats(
                 continue
         elif pari_key in ("PLACE47_1", "PLACE47_2", "COUPLE_PLACE47_12", "TRIO_ORDRE"):
             if nombre_partants < 4 or nombre_partants >= 8:
+                continue
+        elif pari_key == "PICK5":
+            if nombre_partants < 14:
                 continue
 
         for mode in MODES:
@@ -618,6 +624,17 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict, no
                 and positions.get(sorted_participants[1].num_pmu) == 2
                 and positions.get(sorted_participants[2].num_pmu) == 3
                 and positions.get(sorted_participants[3].num_pmu) == 4)
+
+    elif pari_key == "PICK5":
+        # top5 dans n'importe quel ordre — uniquement ≥14 partants
+        # (le filtrage partants est géré dans la boucle principale)
+        if nombre_partants < 14:
+            return False
+        if len(sorted_participants) < 5:
+            return False
+        top5 = {sorted_participants[i].num_pmu for i in range(5)}
+        real_top5 = {num for num, pos in positions.items() if pos is not None and pos <= 5}
+        return top5 == real_top5
 
     return False
 

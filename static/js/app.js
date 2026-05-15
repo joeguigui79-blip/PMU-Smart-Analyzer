@@ -1892,7 +1892,9 @@ function renderBilanPage(data) {
     "__sep_mini_multi__",
     "MINI_MULTI_4", "MINI_MULTI_5", "MINI_MULTI_6",
     "__sep_super4__",
-    "SUPER4"
+    "SUPER4",
+    "__sep_pick5__",
+    "PICK5"
   ];
 
   parisOrder.forEach(function (key) {
@@ -1927,6 +1929,10 @@ function renderBilanPage(data) {
     }
     if (key === "__sep_super4__") {
       html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Super4</td></tr>';
+      return;
+    }
+    if (key === "__sep_pick5__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Pick 5 (\u226514 partants)</td></tr>';
       return;
     }
     if (key === "__sep_autres__") {
