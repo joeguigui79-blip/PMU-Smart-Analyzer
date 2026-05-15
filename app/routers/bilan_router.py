@@ -477,18 +477,12 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict, no
         return not in_order
 
     elif pari_key == "QUARTE_BONUS3":
-        # les 3 premiers de la sélection (top3 sur 4) sont dans le vrai top3, pas dans l'ordre exact
+        # 3 des 4 chevaux joués sont dans le vrai top3, peu importe l'ordre
         if len(sorted_participants) < 4:
             return False
-        top3_of_selection = {sorted_participants[i].num_pmu for i in range(3)}
-        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
-        if not top3_of_selection == real_top3:
-            return False
-        # Pas dans l'ordre exact
-        in_order = (positions.get(sorted_participants[0].num_pmu) == 1
-                    and positions.get(sorted_participants[1].num_pmu) == 2
-                    and positions.get(sorted_participants[2].num_pmu) == 3)
-        return not in_order
+        selection_4 = [sorted_participants[i] for i in range(4)]
+        nb_in_top3 = sum(1 for ch in selection_4 if positions.get(ch.num_pmu) is not None and positions.get(ch.num_pmu) <= 3)
+        return nb_in_top3 >= 3
 
     elif pari_key == "QUINTE_ORDRE":
         # top5 dans l'ordre exact
@@ -516,25 +510,20 @@ def _simulate_pari(pari_key: str, sorted_participants: list, positions: dict, no
         return not in_order
 
     elif pari_key == "QUINTE_BONUS4":
-        # exactement 4 des 5 joués sont dans le vrai top5
+        # 4 des 5 joués sont dans le vrai top4
         if len(sorted_participants) < 5:
             return False
-        top5 = {sorted_participants[i].num_pmu for i in range(5)}
-        real_top5 = {num for num, pos in positions.items() if pos is not None and pos <= 5}
-        return len(top5 & real_top5) == 4
+        selection_5 = [sorted_participants[i] for i in range(5)]
+        nb_in_top4 = sum(1 for ch in selection_5 if positions.get(ch.num_pmu) is not None and positions.get(ch.num_pmu) <= 4)
+        return nb_in_top4 >= 4
 
     elif pari_key == "QUINTE_BONUS3":
-        # les 3 premiers de la sélection (top3 sur 5) sont dans le vrai top3, pas dans l'ordre exact
+        # 3 chevaux quelconques parmi les 5 joués sont dans le vrai top3
         if len(sorted_participants) < 5:
             return False
-        top3_of_selection = {sorted_participants[i].num_pmu for i in range(3)}
-        real_top3 = {num for num, pos in positions.items() if pos is not None and pos <= 3}
-        if not top3_of_selection == real_top3:
-            return False
-        in_order = (positions.get(sorted_participants[0].num_pmu) == 1
-                    and positions.get(sorted_participants[1].num_pmu) == 2
-                    and positions.get(sorted_participants[2].num_pmu) == 3)
-        return not in_order
+        selection_5 = [sorted_participants[i] for i in range(5)]
+        nb_in_top3 = sum(1 for ch in selection_5 if positions.get(ch.num_pmu) is not None and positions.get(ch.num_pmu) <= 3)
+        return nb_in_top3 >= 3
 
     elif pari_key == "DEUX_SUR_QUATRE":
         # top2 tous dans top4
