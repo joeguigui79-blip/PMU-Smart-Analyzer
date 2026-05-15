@@ -256,6 +256,38 @@ body {
 .hipp-name { font-weight: 700; font-size: 15px; }
 .hipp-count { font-size: 12px; color: var(--text-muted); margin-left: auto; }
 
+/* ---- Courses Sort Bar ---- */
+.courses-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 6px;
+}
+.courses-sort-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.courses-sort-select {
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.courses-sort-select:focus {
+  border-color: var(--gold);
+}
+.courses-sort-select option {
+  background: var(--bg2);
+  color: var(--text);
+}
+
 /* ---- Participant Row ---- */
 .participant-row {
   display: flex;

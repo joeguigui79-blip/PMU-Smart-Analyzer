@@ -5,6 +5,8 @@
 let currentPage = "dashboard";
 var _coursesScrollPos = 0;
 var _coursesLoaded = false;
+var _coursesData = null;        // cache reunions pour le tri
+var _coursesSortMode = "default"; // "default" | "heure"
 let _betModalCourse = null;   // course courante pour le modal de pari
 var _scoringMode = "auto"; // "auto" | "expert" | "sans_cote"
 
@@ -378,6 +380,7 @@ async function loadCourses() {
   content.innerHTML = H().skeletonCards(5);
   try {
     const reunions = await API.reunions();
+    _coursesData = reunions;
     renderCoursesList(reunions);
     _coursesLoaded = true;
     _markPageLoaded("courses");
@@ -390,24 +393,68 @@ async function loadCourses() {
   }
 }
 
+function _applyCourseSort(reunions, mode) {
+  if (mode === "heure") {
+    // Aplatir toutes les courses, trier par heure_depart, puis reconstruire
+    var allCourses = [];
+    reunions.forEach(function (r) {
+      r.courses.forEach(function (c) {
+        allCourses.push({ course: c, hippodrome: r.hippodrome_libelle });
+      });
+    });
+    allCourses.sort(function (a, b) {
+      var ha = a.course.heure_depart || "";
+      var hb = b.course.heure_depart || "";
+      return ha < hb ? -1 : ha > hb ? 1 : 0;
+    });
+    return allCourses; // flat list
+  }
+  return null; // default: grouped by reunion
+}
+
 function renderCoursesList(reunions) {
   const content = document.getElementById("courses-content");
   if (!reunions || !reunions.length) {
     content.innerHTML = "<div class='empty-state'><div class='empty-icon'>🐴</div><div class='empty-title'>Aucune course aujourd'hui</div></div>";
     return;
   }
-  let html = "";
-  reunions.forEach(function (r) {
-    html += "<div class='hipp-header'>" +
-      "<span class='hipp-icon'>🏟️</span>" +
-      "<span class='hipp-name'>" + r.hippodrome_libelle + "</span>" +
-      "<span class='hipp-count'>" + r.courses.length + " courses · R" + r.num_officiel + "</span>" +
-      "</div>";
-    r.courses.forEach(function (c) {
-      html += H().renderCourseCard(c, r.hippodrome_libelle);
+
+  // Barre de tri
+  var sortBar = "<div class='courses-sort-bar'>" +
+    "<span class='courses-sort-label'>Tri :</span>" +
+    "<select class='courses-sort-select' id='courses-sort-select' onchange='_onCoursesSortChange(this.value)'>" +
+    "<option value='default'" + (_coursesSortMode === "default" ? " selected" : "") + ">Par défaut</option>" +
+    "<option value='heure'" + (_coursesSortMode === "heure" ? " selected" : "") + ">Par heure de départ</option>" +
+    "</select>" +
+    "</div>";
+
+  var listHtml = "";
+  if (_coursesSortMode === "heure") {
+    var flat = _applyCourseSort(reunions, "heure");
+    flat.forEach(function (item) {
+      listHtml += H().renderCourseCard(item.course, item.hippodrome);
     });
-  });
-  content.innerHTML = html;
+  } else {
+    reunions.forEach(function (r) {
+      listHtml += "<div class='hipp-header'>" +
+        "<span class='hipp-icon'>🏟️</span>" +
+        "<span class='hipp-name'>" + r.hippodrome_libelle + "</span>" +
+        "<span class='hipp-count'>" + r.courses.length + " courses · R" + r.num_officiel + "</span>" +
+        "</div>";
+      r.courses.forEach(function (c) {
+        listHtml += H().renderCourseCard(c, r.hippodrome_libelle);
+      });
+    });
+  }
+
+  content.innerHTML = sortBar + listHtml;
+}
+
+function _onCoursesSortChange(mode) {
+  _coursesSortMode = mode;
+  if (_coursesData) {
+    renderCoursesList(_coursesData);
+  }
 }
 
 // ---- Course Detail ----
