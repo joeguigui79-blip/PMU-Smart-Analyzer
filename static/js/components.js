@@ -106,7 +106,7 @@
     </div>`;
   }
 
-  function renderCourseCard(course, hippodrome) {
+  function renderCourseCard(course, hippodrome, opts) {
     const disc = disciplineLabel(course.discipline);
     const discCls = disciplineClass(course.discipline);
     const terrain = course.terrain ? `· ${course.terrain.replace(/_/g," ")}` : "";
@@ -115,8 +115,19 @@
     const statBadge = course.statut_resultat === "TERMINE"
       ? `<span class="badge badge-gray">Terminée</span>` : "";
 
+    // Ligne de contexte reunion/hippodrome (mode tri par heure)
+    var contextLine = "";
+    if (opts && opts.showContext) {
+      const rNum = opts.reunion_num != null ? `R${opts.reunion_num}` : "";
+      const hipp = hippodrome || "";
+      const cNum = `C${course.num_ordre}`;
+      const heureStr = formatTime(course.heure_depart);
+      const parts = [heureStr, rNum, hipp, cNum].filter(Boolean);
+      contextLine = `<div class="course-context-line">${parts.join(" · ")}</div>`;
+    }
+
     return `<div class="card clickable" onclick="showCourse(${course.id})">
-      <div class="course-card-header">
+      ${contextLine}<div class="course-card-header">
         <div class="course-num">C${course.num_ordre}</div>
         <div class="course-info">
           <div class="course-name">${course.libelle || course.libelle_court}</div>

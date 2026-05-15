@@ -399,7 +399,7 @@ function _applyCourseSort(reunions, mode) {
     var allCourses = [];
     reunions.forEach(function (r) {
       r.courses.forEach(function (c) {
-        allCourses.push({ course: c, hippodrome: r.hippodrome_libelle });
+        allCourses.push({ course: c, hippodrome: r.hippodrome_libelle, reunion_num: r.num_officiel });
       });
     });
     allCourses.sort(function (a, b) {
@@ -432,7 +432,7 @@ function renderCoursesList(reunions) {
   if (_coursesSortMode === "heure") {
     var flat = _applyCourseSort(reunions, "heure");
     flat.forEach(function (item) {
-      listHtml += H().renderCourseCard(item.course, item.hippodrome);
+      listHtml += H().renderCourseCard(item.course, item.hippodrome, { reunion_num: item.reunion_num, showContext: true });
     });
   } else {
     reunions.forEach(function (r) {
