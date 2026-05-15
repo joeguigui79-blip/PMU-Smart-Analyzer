@@ -1574,10 +1574,12 @@ function renderPronosticsPage(data) {
 
   // Filtre seuil de confiance
   var seuils = [
+    {key: 10, label: "10%+"},
     {key: 20, label: "20%+"},
     {key: 30, label: "30%+"},
     {key: 40, label: "40%+"},
-    {key: 50, label: "50%+"}
+    {key: 50, label: "50%+"},
+    {key: 60, label: "60%+"}
   ];
   html += '<div class="scoring-toggle" style="margin-bottom:16px;">';
   for (var i = 0; i < seuils.length; i++) {
