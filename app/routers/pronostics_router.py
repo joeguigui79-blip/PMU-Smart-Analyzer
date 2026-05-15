@@ -55,6 +55,9 @@ CHEVAUX_PAR_PARI = {
     "TRIO_ORDRE": 3,
     "TRIO": 3,
     "SUPER4": 4,
+    "QUARTE_DERIVED": 4,
+    "TIERCE_DERIVED_FROM_QUINTE": 3,
+    "TIERCE_DERIVED_FROM_QUARTE": 3,
 }
 
 # Labels lisibles
@@ -88,6 +91,9 @@ PARIS_LABELS = {
     "TRIO_ORDRE": "Trio Ordre",
     "TRIO": "Trio",
     "SUPER4": "Super 4",
+    "QUARTE_DERIVED": "Quart\u00e9+ (sur Quint\u00e9+)",
+    "TIERCE_DERIVED_FROM_QUINTE": "Tierc\u00e9 (sur Quint\u00e9+)",
+    "TIERCE_DERIVED_FROM_QUARTE": "Tierc\u00e9 (sur Quart\u00e9+)",
 }
 
 MODES = ["auto", "expert", "sans_cote"]
@@ -268,8 +274,70 @@ async def get_pronostics(
                 ],
             })
 
-        # Trier par taux décroissant
-        course_pronostics.sort(key=lambda x: x["taux"], reverse=True)
+        # ---- Pronostics dérivés : Quarté+/Tiercé sur courses Quinté+/Quarté+ ----
+        is_quinte = any(a.upper() in paris_dispo for a in ["QUINTE_PLUS", "E_QUINTE_PLUS", "QUINTE", "QUINTE+"])
+        is_quarte = any(a.upper() in paris_dispo for a in ["QUARTE_PLUS", "E_QUARTE_PLUS", "QUARTE", "QUARTE+"])
+
+        if is_quinte or is_quarte:
+            # Déterminer le meilleur mode de référence (ordre de préférence)
+            ref_pari_order = (
+                ["QUINTE_DESORDRE", "QUINTE_ORDRE", "QUINTE_BONUS4", "QUARTE_DESORDRE", "QUARTE_ORDRE", "TIERCE_DESORDRE"]
+                if is_quinte
+                else ["QUARTE_DESORDRE", "QUARTE_ORDRE", "TIERCE_DESORDRE"]
+            )
+            ref_mode = None
+            for ref_key in ref_pari_order:
+                found = next((p for p in course_pronostics if p["pari"] == ref_key), None)
+                if found:
+                    ref_mode = found["mode"]
+                    break
+            # Fallback : premier mode disponible dans bilan
+            if ref_mode is None:
+                for mode in MODES:
+                    if any(
+                        paris_data.get(pk, {}).get(mode, {}).get("evaluees", 0) >= 3
+                        for pk in ["QUINTE_DESORDRE", "QUARTE_DESORDRE", "TIERCE_DESORDRE"]
+                    ):
+                        ref_mode = mode
+                        break
+            if ref_mode is None:
+                ref_mode = "auto"
+
+            sorted_ref = sorted(
+                course.participants,
+                key=lambda p: _get_score_for_mode(p, ref_mode),
+                reverse=True,
+            )
+
+            def _make_derived(pari_key: str, nb: int) -> dict:
+                chevaux_d = sorted_ref[:nb]
+                return {
+                    "pari": pari_key,
+                    "pari_label": PARIS_LABELS[pari_key],
+                    "mode": ref_mode,
+                    "mode_label": MODE_LABELS[ref_mode],
+                    "taux": None,
+                    "is_derived": True,
+                    "chevaux": [
+                        {
+                            "num_pmu": c.num_pmu,
+                            "nom": c.nom,
+                            "score": round(_get_score_for_mode(c, ref_mode), 1),
+                            "is_value_bet": bool(c.is_value_bet),
+                        }
+                        for c in chevaux_d
+                    ],
+                }
+
+            if is_quinte and len(sorted_ref) >= 4:
+                course_pronostics.append(_make_derived("QUARTE_DERIVED", 4))
+            if is_quinte and len(sorted_ref) >= 3:
+                course_pronostics.append(_make_derived("TIERCE_DERIVED_FROM_QUINTE", 3))
+            elif is_quarte and not is_quinte and len(sorted_ref) >= 3:
+                course_pronostics.append(_make_derived("TIERCE_DERIVED_FROM_QUARTE", 3))
+
+        # Trier par taux décroissant (None en fin de liste)
+        course_pronostics.sort(key=lambda x: (x["taux"] is None, -(x["taux"] or 0)))
 
         if course_pronostics:
             recommendations.append({

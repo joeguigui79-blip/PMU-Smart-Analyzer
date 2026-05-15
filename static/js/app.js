@@ -1833,9 +1833,11 @@ function renderBilanPage(data) {
     "PLACE47_1", "PLACE47_2",
     "COUPLE_PLACE47_12",
     "TRIO_ORDRE",
-    "__sep_autres_paris__",
+    "__sep_tierce__",
     "TIERCE_ORDRE", "TIERCE_DESORDRE",
+    "__sep_quarte__",
     "QUARTE_ORDRE", "QUARTE_DESORDRE", "QUARTE_BONUS3",
+    "__sep_quinte__",
     "QUINTE_ORDRE", "QUINTE_DESORDRE", "QUINTE_BONUS4", "QUINTE_BONUS3",
     "DEUX_SUR_QUATRE",
     "__sep_multi_classique__",
@@ -1856,8 +1858,16 @@ function renderBilanPage(data) {
       html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Plac\u00e9 \u2014 4 \u00e0 7 partants (top 2 seulement)</td></tr>';
       return;
     }
-    if (key === "__sep_autres_paris__") {
-      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Autres paris</td></tr>';
+    if (key === "__sep_tierce__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Tierc\u00e9 \u2014 3 chevaux (Ordre / D\u00e9sordre)</td></tr>';
+      return;
+    }
+    if (key === "__sep_quarte__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Quart\u00e9+ \u2014 4 chevaux (Ordre / D\u00e9sordre / Bonus 3)</td></tr>';
+      return;
+    }
+    if (key === "__sep_quinte__") {
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Quint\u00e9+ \u2014 5 chevaux (Ordre / D\u00e9sordre / Bonus 4\u20445 / Bonus 3)</td></tr>';
       return;
     }
     if (key === "__sep_multi_classique__") {
