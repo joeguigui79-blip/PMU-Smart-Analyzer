@@ -94,6 +94,9 @@ app.include_router(bilan_router.router)
 from app.routers import pronostics_router
 app.include_router(pronostics_router.router)
 
+from app.routers import couple_jockey as couple_jockey_router
+app.include_router(couple_jockey_router.router)
+
 # ---- Endpoint de gestion du cache ----
 from app.cache import cache as _cache
 

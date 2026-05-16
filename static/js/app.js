@@ -9,6 +9,8 @@ var _coursesData = null;        // cache reunions pour le tri
 var _coursesSortMode = "default"; // "default" | "heure"
 let _betModalCourse = null;   // course courante pour le modal de pari
 var _scoringMode = "auto"; // "auto" | "expert" | "sans_cote"
+// POC Phase 1 : badges couple cheval-jockey (affichage seul, ne touche pas les scores)
+var _coupleJockeyBadges = {}; // { [num_pmu]: { couple_status, couple_label, badge_color } }
 
 // Cache de chargement par page : null = jamais chargé, sinon timestamp (ms)
 var _pageLoaded = {
@@ -466,15 +468,58 @@ async function showCourse(courseId) {
   content.innerHTML = "<div style='padding:40px;text-align:center'><div class='spinner'></div></div>";
   document.getElementById("page-course-back-btn").style.display = "flex";
 
+  // Reset badges couple pour cette course
+  _coupleJockeyBadges = {};
+
   try {
     const course = await API.course(courseId);
     renderCourseDetail(course, null);
+    // Charger les badges couple-jockey en arrière-plan (affichage seul)
+    _loadCoupleJockey(courseId);
   } catch (e) {
     if (e && e.isAuthError) return; // 401 → login screen already shown by apiFetch
     content.innerHTML = "<div class='empty-state'><div class='empty-icon'>⚠️</div><div class='empty-title'>Erreur de chargement</div></div>";
     showToast("Impossible de charger cette course", true);
   }
 }
+
+// ---- POC Phase 1 : Chargement asynchrone des badges couple-jockey ----
+async function _loadCoupleJockey(courseId) {
+  try {
+    var data = await API.coupleJockey(courseId);
+    if (!data || !data.badges) return;
+    _coupleJockeyBadges = data.badges || {};
+    // Mettre à jour uniquement les badges dans le DOM existant (pas de re-render complet)
+    _updateCoupleBadgesInDom();
+  } catch (e) {
+    // Silencieux : les badges sont optionnels
+  }
+}
+
+// Injecte/met à jour les badges couple dans le DOM sans re-render complet
+function _updateCoupleBadgesInDom() {
+  var list = document.getElementById("participants-list");
+  if (!list) return;
+  var rows = list.querySelectorAll(".participant-row-wrap[data-num-pmu]");
+  rows.forEach(function (row) {
+    var numPmu = row.getAttribute("data-num-pmu");
+    var badgeZone = row.querySelector(".p-couple-badges");
+    if (!badgeZone) return;
+    var badge = _coupleJockeyBadges[numPmu];
+    badgeZone.innerHTML = badge ? _renderCoupleBadge(badge) : "";
+  });
+}
+
+// Génère le HTML d'un badge couple
+function _renderCoupleBadge(badge) {
+  if (!badge || !badge.couple_label) return "";
+  var cls = "badge-couple-new";
+  if (badge.badge_color === "green") cls = "badge-couple-positive";
+  else if (badge.badge_color === "red") cls = "badge-couple-negative";
+  else if (badge.badge_color === "orange") cls = "badge-couple-warning";
+  return "<span class='couple-badge " + cls + "'>\uD83D\uDC65 " + badge.couple_label + "</span>";
+}
+
 
 function renderCourseDetail(course, suggestions) {
   const content = document.getElementById("course-content");
@@ -770,12 +815,20 @@ function renderParticipantRowWithBet(p, rank, course, hippodrome) {
     ? "<span class='arrival-pos pos-" + p.position_arrivee + "'>" + p.position_arrivee + "e</span>"
     : "";
 
-  return "<div class='participant-row-wrap'>" +
+  // POC Phase 1 : badge couple-jockey (affichage seul, chargé en async)
+  var coupleHtml = "";
+  var coupleBadge = _coupleJockeyBadges && _coupleJockeyBadges[String(p.num_pmu)];
+  if (coupleBadge) {
+    coupleHtml = _renderCoupleBadge(coupleBadge);
+  }
+
+  return "<div class='participant-row-wrap' data-num-pmu='" + p.num_pmu + "'>" +
     "<div class='participant-row' data-pid='" + p.id + "' onclick='showParticipantModal(" + safeP + ")'>" +
     "<div class='p-num " + cls + "'>" + p.num_pmu + "</div>" +
     "<div class='p-info'>" +
     "<div class='p-name'>" + p.nom + " " + vb + " " + posHtml + "</div>" +
     "<div class='p-sub'>" + (p.jockey || "—") + " · " + (p.entraineur || "—") + "</div>" +
+    "<div class='p-couple-badges'>" + coupleHtml + "</div>" +
     "</div>" +
     "<div class='p-right'>" +
     "<span class='p-cote'>" + H().formatCote(p.cote_actuelle) + "</span>" +

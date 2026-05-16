@@ -120,6 +120,9 @@ const API = {
   liveScores: function (courseId) { return apiFetch("/api/courses/" + courseId + "/live-scores"); },
   pronostics: function (courseId) { return apiFetch("/api/courses/" + courseId + "/pronostics"); },
   pronosticsPage: function (seuil) { return cachedFetch("/api/pronostics?seuil=" + (seuil || 30)); },
+
+  // ---- POC Phase 1 : Couple Cheval-Jockey (affichage seul) ----
+  coupleJockey: function (courseId) { return apiFetch("/api/courses/" + courseId + "/couple-jockey"); },
 };
 
 window.API = API;

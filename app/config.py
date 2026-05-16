@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 PMU_BASE_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 PMU_PARTICIPANTS_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date}/R{reunion}/C{course}/participants"
 PMU_ARRIVEE_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date}/R{reunion}/C{course}/arrivee"
+PMU_PERFORMANCES_URL = "https://offline.turfinfo.api.pmu.fr/rest/client/61/programme/{date}/R{reunion}/C{course}/performances-detaillees/pretty"
 
 # DATABASE_URL format attendu: postgresql+asyncpg://user:password@host:port/dbname
 # Neon/Supabase fournissent une URL postgres:// ou postgresql:// — conversion automatique ci-dessous.
