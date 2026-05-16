@@ -1906,7 +1906,7 @@ function renderBilanPage(data) {
       return;
     }
     if (key === "__sep_place47__") {
-      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Plac\u00e9 \u2014 4 \u00e0 7 partants (top 2 seulement)</td></tr>';
+      html += '<tr class="bilan-row-group-header"><td colspan="4" class="bilan-td-group">Plac\u00e9 \u2014 moins de 8 partants (top 2 seulement)</td></tr>';
       return;
     }
     if (key === "__sep_tierce__") {
