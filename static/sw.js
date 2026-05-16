@@ -10,8 +10,8 @@
      - Les réponses 4xx/5xx ne sont JAMAIS mises en cache
    ============================================= */
 
-const CACHE_STATIC_V  = "pmu-static-v15";
-const CACHE_API_V     = "pmu-api-v11";
+const CACHE_STATIC_V  = "pmu-static-v16";
+const CACHE_API_V     = "pmu-api-v12";
 
 const STATIC_ASSETS = [
   "/",

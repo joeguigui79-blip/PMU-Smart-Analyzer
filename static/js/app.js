@@ -485,26 +485,52 @@ async function showCourse(courseId) {
 
 // ---- POC Phase 1 : Chargement asynchrone des badges couple-jockey ----
 async function _loadCoupleJockey(courseId) {
+  console.log("[COUPLE-JOCKEY] Chargement pour courseId=" + courseId);
   try {
     var data = await API.coupleJockey(courseId);
-    if (!data || !data.badges) return;
+    console.log("[COUPLE-JOCKEY] Réponse reçue :", data);
+    if (!data || !data.badges) {
+      console.warn("[COUPLE-JOCKEY] Réponse vide ou sans badges — courseId=" + courseId);
+      _coupleJockeyBadges = {};
+      _updateCoupleBadgesInDom();
+      return;
+    }
+    if (data.error) {
+      console.warn("[COUPLE-JOCKEY] Erreur endpoint :", data.error, "— badges fallback gris");
+    }
     _coupleJockeyBadges = data.badges || {};
+    console.log("[COUPLE-JOCKEY] " + Object.keys(_coupleJockeyBadges).length + " badges chargés, injection DOM…");
     // Mettre à jour uniquement les badges dans le DOM existant (pas de re-render complet)
     _updateCoupleBadgesInDom();
   } catch (e) {
-    // Silencieux : les badges sont optionnels
+    console.warn("[COUPLE-JOCKEY] Erreur réseau/API :", e);
+    // Fallback : badges gris "données indispo" pour tous les partants visibles
+    _coupleJockeyBadges = null; // null = signal fallback
+    _updateCoupleBadgesInDom();
   }
 }
 
 // Injecte/met à jour les badges couple dans le DOM sans re-render complet
 function _updateCoupleBadgesInDom() {
   var list = document.getElementById("participants-list");
-  if (!list) return;
+  if (!list) {
+    console.warn("[COUPLE-JOCKEY] #participants-list introuvable dans le DOM");
+    return;
+  }
   var rows = list.querySelectorAll(".participant-row-wrap[data-num-pmu]");
+  console.log("[COUPLE-JOCKEY] _updateCoupleBadgesInDom : " + rows.length + " lignes trouvées");
   rows.forEach(function (row) {
     var numPmu = row.getAttribute("data-num-pmu");
     var badgeZone = row.querySelector(".p-couple-badges");
-    if (!badgeZone) return;
+    if (!badgeZone) {
+      console.warn("[COUPLE-JOCKEY] .p-couple-badges introuvable pour num_pmu=" + numPmu);
+      return;
+    }
+    // _coupleJockeyBadges === null : erreur réseau → badge fallback gris
+    if (_coupleJockeyBadges === null) {
+      badgeZone.innerHTML = "<span class='couple-badge badge-couple-new'>\uD83D\uDC65 Données indispo</span>";
+      return;
+    }
     var badge = _coupleJockeyBadges[numPmu];
     badgeZone.innerHTML = badge ? _renderCoupleBadge(badge) : "";
   });
@@ -512,7 +538,11 @@ function _updateCoupleBadgesInDom() {
 
 // Génère le HTML d'un badge couple
 function _renderCoupleBadge(badge) {
-  if (!badge || !badge.couple_label) return "";
+  if (!badge) return "";
+  // UNKNOWN = jockey inconnu dans la DB — afficher badge gris discret
+  if (!badge.couple_label || badge.couple_status === "UNKNOWN") {
+    return "<span class='couple-badge badge-couple-new'>\uD83D\uDC65 \u2014</span>";
+  }
   var cls = "badge-couple-new";
   if (badge.badge_color === "green") cls = "badge-couple-positive";
   else if (badge.badge_color === "red") cls = "badge-couple-negative";
@@ -863,6 +893,8 @@ async function setScoringMode(mode) {
       }
     }
     renderCourseDetail(_betModalCourse, null);
+    // Ré-injecter les badges couple après le re-render (sans rappel API)
+    _updateCoupleBadgesInDom();
   }
 }
 
