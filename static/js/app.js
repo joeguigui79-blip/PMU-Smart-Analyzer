@@ -528,11 +528,20 @@ function _updateCoupleBadgesInDom() {
     }
     // _coupleJockeyBadges === null : erreur réseau → badge fallback gris
     if (_coupleJockeyBadges === null) {
-      badgeZone.innerHTML = "<span class='couple-badge badge-couple-new'>\uD83D\uDC65 Données indispo</span>";
+      var fallbackHtml = "<span class='couple-badge badge-couple-new'>\uD83D\uDC65 Donn\u00e9es indispo</span>";
+      badgeZone.innerHTML = fallbackHtml;
+      console.log("[COUPLE-JOCKEY] Badge HTML pour cheval N=" + numPmu + " (fallback) : " + fallbackHtml);
       return;
     }
-    var badge = _coupleJockeyBadges[numPmu];
-    badgeZone.innerHTML = badge ? _renderCoupleBadge(badge) : "";
+    // Chercher par string ET par number pour robustesse
+    var badge = _coupleJockeyBadges[numPmu] || _coupleJockeyBadges[Number(numPmu)];
+    var html = _renderCoupleBadge(badge);
+    // Si aucun badge trouvé pour ce cheval, afficher badge gris discret
+    if (!html) {
+      html = "<span class='couple-badge badge-couple-new'>\uD83D\uDC65 \u2014</span>";
+    }
+    badgeZone.innerHTML = html;
+    console.log("[COUPLE-JOCKEY] Badge HTML pour cheval N=" + numPmu + " : " + html);
   });
 }
 
@@ -547,7 +556,8 @@ function _renderCoupleBadge(badge) {
   if (badge.badge_color === "green") cls = "badge-couple-positive";
   else if (badge.badge_color === "red") cls = "badge-couple-negative";
   else if (badge.badge_color === "orange") cls = "badge-couple-warning";
-  return "<span class='couple-badge " + cls + "'>\uD83D\uDC65 " + badge.couple_label + "</span>";
+  var html = "<span class='couple-badge " + cls + "'>\uD83D\uDC65 " + badge.couple_label + "</span>";
+  return html;
 }
 
 

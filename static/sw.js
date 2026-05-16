@@ -1,5 +1,5 @@
 /* =============================================
-   PMU Smart Analyzer — Service Worker v8
+   PMU Smart Analyzer — Service Worker v17
    Stratégies :
      - CACHE-FIRST (stale-while-revalidate) pour les assets statiques
        (.css, .js, .png, .ico, .webmanifest, fonts)
@@ -10,8 +10,8 @@
      - Les réponses 4xx/5xx ne sont JAMAIS mises en cache
    ============================================= */
 
-const CACHE_STATIC_V  = "pmu-static-v16";
-const CACHE_API_V     = "pmu-api-v12";
+const CACHE_STATIC_V  = "pmu-static-v17";
+const CACHE_API_V     = "pmu-api-v13";
 
 const STATIC_ASSETS = [
   "/",
@@ -158,9 +158,12 @@ function cacheFirstSWR(request) {
 function networkFirstApi(request) {
   return fetch(request).then(function (response) {
     // Ne mettre en cache QUE les réponses réussies
+    // IMPORTANT : cloner immédiatement (synchrone) avant tout retour
+    // pour éviter "Response body is already used"
     if (response && response.ok) {
+      var responseToCache = response.clone();
       caches.open(CACHE_API_V).then(function (cache) {
-        cache.put(request, response.clone());
+        cache.put(request, responseToCache);
       });
     }
     return response;
@@ -185,8 +188,9 @@ function networkFirstApi(request) {
 function navigationWithOfflineFallback(request) {
   return fetch(request).then(function (response) {
     if (response && response.ok) {
+      var responseToCache = response.clone();
       caches.open(CACHE_STATIC_V).then(function (cache) {
-        cache.put(request, response.clone());
+        cache.put(request, responseToCache);
       });
     }
     return response;
