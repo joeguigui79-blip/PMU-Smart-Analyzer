@@ -1,5 +1,5 @@
 /* =============================================
-   PMU Smart Analyzer — Auth (login/logout) v2
+   PMU Smart Analyzer — Auth (login/logout) v3
    ============================================= */
 
 (function () {
@@ -141,6 +141,21 @@
     }
   }
 
+  /* ---- Fetch /health en byppassant TOUJOURS le Service Worker ----
+     On force cache:'no-store' + headers no-cache pour éviter qu'un SW
+     serve une réponse d'erreur (502/503) mise en cache pendant un cold start.
+  ---- */
+  function fetchHealth() {
+    return fetch("/health", {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+      },
+    });
+  }
+
   /* ---- Ping /health with retry ---- */
   function pingUntilReady(maxAttempts, intervalMs, onReady, onFail) {
     var attempt = 0;
@@ -149,7 +164,7 @@
       attempt++;
       showWakeupOverlay(attempt, maxAttempts);
 
-      fetch("/health", { method: "GET", cache: "no-store" })
+      fetchHealth()
         .then(function (res) {
           if (res.ok) {
             onReady();
@@ -180,7 +195,7 @@
     }
 
     // Quick probe: first try /health once without showing overlay
-    fetch("/health", { method: "GET", cache: "no-store" })
+    fetchHealth()
       .then(function (res) {
         if (res.ok) {
           // Server already awake — verify token
@@ -199,7 +214,8 @@
   }
 
   function startRetryLoop(token) {
-    var MAX_ATTEMPTS = 6;
+    // 12 × 5s = 60s minimum — couvre les cold starts longs Render (30-50s)
+    var MAX_ATTEMPTS = 12;
     var INTERVAL_MS  = 5000;
 
     pingUntilReady(
@@ -216,23 +232,34 @@
   }
 
   function verifyToken(token) {
-    fetch("/api/dashboard", {
-      headers: { "Authorization": "Bearer " + token },
+    fetch("/api/verify", {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        "Authorization": "Bearer " + token,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+      },
     }).then(function (res) {
-      if (res.status === 401) {
-        // Token invalid (e.g. old UUID token after HMAC migration)
+      if (res.status === 401 || res.status === 403) {
+        // Token invalide (ex: ancien token UUID après migration HMAC)
         clearToken();
         showLoginScreen();
         return;
       }
-      // Token valid → start the app
+      if (!res.ok) {
+        // Serveur vivant mais erreur inattendue — retenter le boot
+        // plutôt que d'afficher un écran de login trompeur
+        setTimeout(function () { boot(); }, 2000);
+        return;
+      }
+      // Token valide → démarrer l'app
       if (typeof window._appInit === "function") {
         window._appInit();
       }
     }).catch(function () {
-      // Should not happen — server was just confirmed alive by ping
-      // Show login as fallback
-      showLoginScreen("Erreur de connexion. Veuillez vous reconnecter.");
+      // Réseau perdu juste après le ping — réessayer le boot complet
+      setTimeout(function () { boot(); }, 3000);
     });
   }
 

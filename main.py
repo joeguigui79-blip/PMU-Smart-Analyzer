@@ -130,6 +130,14 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.get("/api/verify", include_in_schema=False)
+async def verify_token_endpoint():
+    """Endpoint léger pour valider un token — utilisé par le boot client.
+    Le middleware auth_middleware valide déjà le token avant d'arriver ici.
+    """
+    return {"ok": True}
+
+
 @app.get("/sw.js", include_in_schema=False)
 async def serve_sw():
     """Service Worker servi depuis la racine pour avoir scope '/'."""

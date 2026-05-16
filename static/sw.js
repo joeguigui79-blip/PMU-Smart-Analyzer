@@ -1,14 +1,17 @@
 /* =============================================
-   PMU Smart Analyzer — Service Worker v7
+   PMU Smart Analyzer — Service Worker v8
    Stratégies :
      - CACHE-FIRST (stale-while-revalidate) pour les assets statiques
        (.css, .js, .png, .ico, .webmanifest, fonts)
      - NETWORK-FIRST pour les appels API (/api/)
+     - NETWORK-ONLY (jamais de cache) pour /health, /api/login,
+       /api/logout, /api/verify → contournement garanti du SW
      - Page offline.html pré-cachée pour les navigations sans réseau
+     - Les réponses 4xx/5xx ne sont JAMAIS mises en cache
    ============================================= */
 
-const CACHE_STATIC_V  = "pmu-static-v12";
-const CACHE_API_V     = "pmu-api-v8";
+const CACHE_STATIC_V  = "pmu-static-v13";
+const CACHE_API_V     = "pmu-api-v9";
 
 const STATIC_ASSETS = [
   "/",
@@ -88,6 +91,15 @@ self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET") return;
   if (url.origin !== self.location.origin) return;
 
+  // ----- NETWORK-ONLY : endpoints critiques jamais mis en cache -----
+  // /health, /api/login, /api/logout, /api/verify doivent toujours
+  // aller sur le réseau réel — une réponse cachée (502/503) bloquerait le boot.
+  const BYPASS_PATHS = ["/health", "/api/login", "/api/logout", "/api/verify"];
+  if (BYPASS_PATHS.some(function (p) { return url.pathname === p; })) {
+    // Pas de respondWith → le navigateur fait la requête directement
+    return;
+  }
+
   // ----- API calls → Network-first -----
   if (url.pathname.startsWith("/api/")) {
     const isCacheable = API_CACHE_PATHS.some(function (p) {
@@ -96,7 +108,7 @@ self.addEventListener("fetch", function (event) {
     if (isCacheable) {
       event.respondWith(networkFirstApi(event.request));
     }
-    // Appels API non listés (ex: POST, non-cacheable) → réseau direct, pas de respondWith
+    // Appels API non listés → réseau direct, pas de respondWith
     return;
   }
 
@@ -118,12 +130,14 @@ self.addEventListener("fetch", function (event) {
    1. Retourne le cache immédiatement si disponible
    2. Lance un fetch en arrière-plan pour mettre à jour le cache
    3. Si pas de cache, fait le fetch et met en cache
+   IMPORTANT : les réponses non-ok (4xx/5xx) ne sont JAMAIS mises en cache.
 ------------------------------------------------------- */
 function cacheFirstSWR(request) {
   return caches.open(CACHE_STATIC_V).then(function (cache) {
     return cache.match(request).then(function (cached) {
       // Refresh en arrière-plan (stale-while-revalidate)
       var networkUpdate = fetch(request).then(function (response) {
+        // Ne mettre en cache QUE les réponses réussies
         if (response && response.ok) {
           cache.put(request, response.clone());
         }
@@ -139,9 +153,11 @@ function cacheFirstSWR(request) {
 /* -------------------------------------------------------
    NETWORK-FIRST pour les appels API
    Essaie le réseau, sert le cache si hors ligne
+   IMPORTANT : les réponses non-ok (4xx/5xx) ne sont JAMAIS mises en cache.
 ------------------------------------------------------- */
 function networkFirstApi(request) {
   return fetch(request).then(function (response) {
+    // Ne mettre en cache QUE les réponses réussies
     if (response && response.ok) {
       caches.open(CACHE_API_V).then(function (cache) {
         cache.put(request, response.clone());
