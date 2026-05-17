@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
@@ -138,7 +138,7 @@ class ScoringWeight(Base):
     poids: Mapped[float] = mapped_column(Float, default=0.0)
     precision: Mapped[float] = mapped_column(Float, default=0.0)
     nb_samples: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class CalibrationWeight(Base):
@@ -152,7 +152,7 @@ class CalibrationWeight(Base):
     discipline: Mapped[str] = mapped_column(String(20), default="PLAT", index=True)
     critere: Mapped[str] = mapped_column(String(50), index=True)
     poids: Mapped[float] = mapped_column(Float, default=0.0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class DailyStats(Base):
@@ -164,4 +164,4 @@ class DailyStats(Base):
     nb_value_bets: Mapped[int] = mapped_column(Integer, default=0)
     nb_top_picks_correct: Mapped[int] = mapped_column(Integer, default=0)
     nb_courses_finished: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

@@ -15,7 +15,7 @@ Logique :
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -247,7 +247,7 @@ async def calibrate_and_store(db: AsyncSession) -> dict:
             "fallback_disciplines": list(SCORING_WEIGHTS_DISCIPLINE.keys()),
         }
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     updated = []
 
     for disc, weights in auto_weights.items():

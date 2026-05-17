@@ -12,7 +12,7 @@
     if (!isoStr) return "?";
     try {
       const d = new Date(isoStr);
-      return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
     } catch { return "?"; }
   }
 

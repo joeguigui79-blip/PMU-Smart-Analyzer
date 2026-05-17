@@ -1467,7 +1467,7 @@ function renderStatsPage(scoringData, calibData) {
 
   if (calibData && calibData.last_updated_global) {
     var dt = new Date(calibData.last_updated_global);
-    var dtStr = dt.toLocaleDateString("fr-FR") + " " + dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    var dtStr = dt.toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
     html += '<div class="stats-summary-card"><div class="ssc-value ssc-small">' + dtStr + '</div><div class="ssc-label">Dernière calibration</div></div>';
   } else {
     html += '<div class="stats-summary-card"><div class="ssc-value ssc-small">—</div><div class="ssc-label">Dernière calibration</div></div>';
@@ -1560,7 +1560,7 @@ function renderStatsPage(scoringData, calibData) {
       html += '<div class="weights-card-title">' + disc;
       if (calD.last_updated) {
         var d2 = new Date(calD.last_updated);
-        html += ' <span class="weights-date">MAJ: ' + d2.toLocaleDateString("fr-FR") + "</span>";
+        html += ' <span class="weights-date">MAJ: ' + d2.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }) + "</span>";
       }
       html += "</div>";
 
