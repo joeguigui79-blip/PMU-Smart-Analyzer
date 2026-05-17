@@ -1899,6 +1899,7 @@ function renderBilanEvolutionBlock(data) {
 
 function renderBilanPage(data) {
   var totalCourses = (data && data.total_courses) || 0;
+  var totalEnAttente = (data && data.total_courses_en_attente) || 0;
   var paris = (data && data.paris) || {};
 
   var html = '<div class="stats-page">';
@@ -1945,6 +1946,9 @@ function renderBilanPage(data) {
   // Résumé
   html += '<div class="stats-summary-row">';
   html += '<div class="stats-summary-card"><div class="ssc-value">' + totalCourses + '</div><div class="ssc-label">Courses \u00e9valu\u00e9es</div></div>';
+  if (totalEnAttente > 0) {
+    html += '<div class="stats-summary-card ssc-warning"><div class="ssc-value">' + totalEnAttente + '</div><div class="ssc-label">En attente d\u2019arriv\u00e9e</div></div>';
+  }
   html += '</div>';
 
   if (totalCourses === 0) {

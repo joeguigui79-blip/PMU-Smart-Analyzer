@@ -1002,6 +1002,13 @@ body {
   padding: 10px 8px;
   text-align: center;
 }
+.stats-summary-card.ssc-warning {
+  border-color: #b45309;
+  background: rgba(180, 83, 9, 0.1);
+}
+.stats-summary-card.ssc-warning .ssc-value {
+  color: #f59e0b;
+}
 .ssc-value {
   font-size: 22px;
   font-weight: 700;

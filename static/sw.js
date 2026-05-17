@@ -1,5 +1,5 @@
 /* =============================================
-   PMU Smart Analyzer — Service Worker v17
+   PMU Smart Analyzer — Service Worker v18
    Stratégies :
      - CACHE-FIRST (stale-while-revalidate) pour les assets statiques
        (.css, .js, .png, .ico, .webmanifest, fonts)
@@ -10,8 +10,8 @@
      - Les réponses 4xx/5xx ne sont JAMAIS mises en cache
    ============================================= */
 
-const CACHE_STATIC_V  = "pmu-static-v17";
-const CACHE_API_V     = "pmu-api-v13";
+const CACHE_STATIC_V  = "pmu-static-v18";
+const CACHE_API_V     = "pmu-api-v14";
 
 const STATIC_ASSETS = [
   "/",

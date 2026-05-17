@@ -4,6 +4,7 @@ Router Bilan — Backtesting des modes de scoring sur les courses terminées.
 Endpoint :
   GET /api/bilan — Retourne pour chaque type de pari et chaque mode (auto/expert/sans_cote)
                    le nombre de courses évaluées et le nombre de paris gagnés.
+                   Inclut total_courses_en_attente : courses TERMINE sans participants/arrivée chargés.
 
 Logique de simulation par type de pari (top N chevaux selon le score du mode) :
   - Gagnant       : top1 finit 1er
@@ -30,6 +31,7 @@ Catégories Placé séparées par nombre de partants :
 
 Seuls les paris présents dans course.paris_disponibles sont comptabilisés.
 Seules les courses avec des position_arrivee renseignées sont prises en compte.
+Les courses TERMINE sans participants ou sans arrivées chargées sont comptées dans total_courses_en_attente.
 """
 import json
 import logging
@@ -97,17 +99,17 @@ PARIS_LABELS = {
 
 # Alias supplémentaires pour la correspondance avec paris_disponibles
 PARIS_ALIASES: dict[str, list[str]] = {
-    "GAGNANT":              ["SIMPLE_GAGNANT", "E_SIMPLE_GAGNANT", "GAGNANT", "gagnant"],
+    "GAGNANT":              ["SIMPLE_GAGNANT", "E_SIMPLE_GAGNANT", "SIMPLE_GAGNANT_INTERNATIONAL", "E_SIMPLE_GAGNANT_INTERNATIONAL", "GAGNANT", "gagnant"],
     # Placé ≥8 partants
-    "PLACE8_1":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
-    "PLACE8_2":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
-    "PLACE8_3":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "PLACE8_1":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "SIMPLE_PLACE_INTERNATIONAL", "E_SIMPLE_PLACE_INTERNATIONAL", "PLACE", "place"],
+    "PLACE8_2":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "SIMPLE_PLACE_INTERNATIONAL", "E_SIMPLE_PLACE_INTERNATIONAL", "PLACE", "place"],
+    "PLACE8_3":             ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "SIMPLE_PLACE_INTERNATIONAL", "E_SIMPLE_PLACE_INTERNATIONAL", "PLACE", "place"],
     "COUPLE_PLACE8_12":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     "COUPLE_PLACE8_23":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     "COUPLE_PLACE8_13":     ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     # Placé 4-7 partants
-    "PLACE47_1":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
-    "PLACE47_2":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
+    "PLACE47_1":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "SIMPLE_PLACE_INTERNATIONAL", "E_SIMPLE_PLACE_INTERNATIONAL", "PLACE", "place"],
+    "PLACE47_2":            ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "SIMPLE_PLACE_INTERNATIONAL", "E_SIMPLE_PLACE_INTERNATIONAL", "PLACE", "place"],
     "COUPLE_PLACE47_12":    ["COUPLE_ORDRE", "E_COUPLE_ORDRE", "couple_ordre", "COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     # Placé générique
     "PLACE_1":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
@@ -197,6 +199,14 @@ def _process_course_for_stats(
     all_participants = course.participants
     participants_with_pos = [p for p in all_participants if p.position_arrivee is not None]
     if len(participants_with_pos) < 2:
+        logger.info(
+            "[BILAN] course id=%s %s exclue: raison=participants_insuffisants "
+            "(total=%d avec_position=%d)",
+            course.id,
+            getattr(course, 'libelle_court', ''),
+            len(all_participants),
+            len(participants_with_pos),
+        )
         return False
 
     positions = {p.num_pmu: p.position_arrivee for p in participants_with_pos}
@@ -686,6 +696,7 @@ async def get_bilan(
     stats = _init_stats(list(PARIS_LABELS.keys()))
     evolution_stats: dict[str, dict[str, dict[str, dict[str, int]]]] = {}
     total_courses_with_results = 0
+    total_courses_en_attente = 0  # TERMINE mais sans participants/arrivée chargés
 
     # Convertir date_from en ISO pour comparaison correcte inter-mois
     date_from_iso = _ddmmyyyy_to_iso(date_from) if date_from else None
@@ -697,7 +708,23 @@ async def get_bilan(
         matches_discipline = _is_discipline_match(course.discipline, discipline)
 
         if matches_period and matches_discipline:
-            if _process_course_for_stats(course, list(PARIS_LABELS.keys()), stats):
+            # Détection préalable : course TERMINE sans participants chargés → en_attente
+            nb_participants = len(course.participants)
+            nb_avec_pos = sum(1 for p in course.participants if p.position_arrivee is not None)
+            if nb_participants == 0:
+                logger.info(
+                    "[BILAN] course id=%s (date=%s) en_attente: raison=aucun_participant_en_base",
+                    course.id, course_date_str,
+                )
+                total_courses_en_attente += 1
+            elif nb_avec_pos < 2:
+                logger.info(
+                    "[BILAN] course id=%s (date=%s) en_attente: raison=arrivee_non_chargee "
+                    "(participants=%d avec_position=%d)",
+                    course.id, course_date_str, nb_participants, nb_avec_pos,
+                )
+                total_courses_en_attente += 1
+            elif _process_course_for_stats(course, list(PARIS_LABELS.keys()), stats):
                 total_courses_with_results += 1
 
         if matches_discipline:
@@ -725,6 +752,7 @@ async def get_bilan(
 
     result_data = {
         "total_courses": total_courses_with_results,
+        "total_courses_en_attente": total_courses_en_attente,
         "paris": paris_result,
         "evolution": evolution_result,
     }
