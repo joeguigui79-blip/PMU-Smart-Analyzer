@@ -697,6 +697,9 @@ async def get_bilan(
     evolution_stats: dict[str, dict[str, dict[str, dict[str, int]]]] = {}
     total_courses_with_results = 0
     total_courses_en_attente = 0  # TERMINE mais sans participants/arrivée chargés
+    # Compteurs par discipline pour log de synthèse
+    _disc_evaluable: dict[str, int] = {}
+    _disc_en_attente: dict[str, int] = {}
 
     # Convertir date_from en ISO pour comparaison correcte inter-mois
     date_from_iso = _ddmmyyyy_to_iso(date_from) if date_from else None
@@ -711,27 +714,39 @@ async def get_bilan(
             # Détection préalable : course TERMINE sans participants chargés → en_attente
             nb_participants = len(course.participants)
             nb_avec_pos = sum(1 for p in course.participants if p.position_arrivee is not None)
+            disc_key = course.discipline or "INCONNU"
             if nb_participants == 0:
                 logger.info(
-                    "[BILAN] course id=%s (date=%s) en_attente: raison=aucun_participant_en_base",
-                    course.id, course_date_str,
+                    "[BILAN] course id=%s disc=%s (date=%s) en_attente: raison=aucun_participant_en_base",
+                    course.id, disc_key, course_date_str,
                 )
                 total_courses_en_attente += 1
+                _disc_en_attente[disc_key] = _disc_en_attente.get(disc_key, 0) + 1
             elif nb_avec_pos < 2:
                 logger.info(
-                    "[BILAN] course id=%s (date=%s) en_attente: raison=arrivee_non_chargee "
+                    "[BILAN] course id=%s disc=%s (date=%s) en_attente: raison=arrivee_non_chargee "
                     "(participants=%d avec_position=%d)",
-                    course.id, course_date_str, nb_participants, nb_avec_pos,
+                    course.id, disc_key, course_date_str, nb_participants, nb_avec_pos,
                 )
                 total_courses_en_attente += 1
+                _disc_en_attente[disc_key] = _disc_en_attente.get(disc_key, 0) + 1
             elif _process_course_for_stats(course, list(PARIS_LABELS.keys()), stats):
                 total_courses_with_results += 1
+                _disc_evaluable[disc_key] = _disc_evaluable.get(disc_key, 0) + 1
 
         if matches_discipline:
             week_key = _week_key_from_date_str(course_date_str or "")
             if week_key:
                 week_stats = evolution_stats.setdefault(week_key, _init_stats(EVOLUTION_PARIS))
                 _process_course_for_stats(course, EVOLUTION_PARIS, week_stats)
+
+    # Log de synthèse par discipline (aide au diagnostic)
+    logger.info(
+        "[BILAN] synthese periode=%s discipline=%s — evaluables=%d en_attente=%d | "
+        "evaluable_par_disc=%s attente_par_disc=%s",
+        periode, discipline, total_courses_with_results, total_courses_en_attente,
+        _disc_evaluable, _disc_en_attente,
+    )
 
     paris_result = _serialize_stats(stats, PARIS_LABELS)
     latest_weeks = sorted(evolution_stats.keys())[-8:]
