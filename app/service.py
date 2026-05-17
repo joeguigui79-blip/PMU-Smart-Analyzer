@@ -611,17 +611,20 @@ async def recuperer_arrivees_manquantes(db: AsyncSession) -> int:
 
 async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: int = 7) -> dict:
     """
-    Charge les participants manquants pour toutes les courses TERMINE des N derniers jours
-    dont nb_part=0 (participants jamais chargés).
+    Charge les participants manquants pour toutes les courses TERMINE des N derniers jours.
 
-    Throttle : 0.3s entre chaque appel API pour ne pas saturer l'API PMU non officielle.
+    Couvre deux cas :
+      1. participants_loaded=False  → jamais tenté
+      2. participants_loaded=True MAIS aucun participant en DB (API PMU renvoyait vide lors
+         du premier essai — ces courses sont maintenant re-tentées systématiquement)
+
+    Throttle : 0.1s entre chaque appel API (réduit depuis 0.3s pour finir avant timeout Render).
     Retourne un dict avec les compteurs : courses_traitees, succes, echecs.
     """
     from app.config import PARIS_TZ
+    from sqlalchemy import func, exists
 
     now = datetime.now(PARIS_TZ)
-    # Construire la liste des date_str DDMMYYYY des N derniers jours (sans aujourd'hui,
-    # qui est déjà couvert par load_programme_today + recuperer_arrivees_manquantes)
     date_strs = []
     for delta in range(0, jours + 1):
         d = now - timedelta(days=delta)
@@ -629,8 +632,8 @@ async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: in
 
     logger.info("[BACKFILL] Démarrage backfill participants — %d derniers jours (%s)", jours, ", ".join(date_strs))
 
-    # Requête : courses TERMINE avec participants_loaded=False dans la fenêtre
-    result = await db.execute(
+    # Cas 1 : jamais tentées (participants_loaded=False)
+    result1 = await db.execute(
         select(Course, Reunion)
         .join(Reunion, Course.reunion_id == Reunion.id)
         .where(
@@ -639,15 +642,51 @@ async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: in
             Reunion.date_str.in_(date_strs),
         )
     )
-    rows = result.all()
+    rows_not_loaded = result1.all()
+
+    # Cas 2 : marquées chargées MAIS 0 participant en DB (API PMU vide au 1er passage)
+    from app.models import Participant as _Participant
+    subq_has_part = (
+        select(_Participant.id)
+        .where(_Participant.course_id == Course.id)
+        .limit(1)
+        .correlate(Course)
+    )
+    result2 = await db.execute(
+        select(Course, Reunion)
+        .join(Reunion, Course.reunion_id == Reunion.id)
+        .where(
+            Course.statut_resultat == "TERMINE",
+            Course.participants_loaded == True,  # noqa: E712
+            ~exists(subq_has_part),
+            Reunion.date_str.in_(date_strs),
+        )
+    )
+    rows_loaded_empty = result2.all()
+
+    # Fusionner en évitant les doublons (par course.id)
+    seen_ids: set[int] = set()
+    rows: list = []
+    for row in rows_not_loaded + rows_loaded_empty:
+        if row[0].id not in seen_ids:
+            seen_ids.add(row[0].id)
+            rows.append(row)
 
     total = len(rows)
     succes = 0
     echecs = 0
 
-    logger.info("[BACKFILL] %d course(s) TERMINE avec participants_loaded=False trouvées", total)
+    logger.info(
+        "[BACKFILL] %d course(s) à traiter — %d jamais tentées, %d marquées chargées mais vides",
+        total, len(rows_not_loaded), len(rows_loaded_empty),
+    )
 
     for course, reunion in rows:
+        # Réinitialiser le flag pour forcer le re-chargement des courses vides
+        if course.participants_loaded and course.id in {r[0].id for r in rows_loaded_empty}:
+            course.participants_loaded = False
+            await db.commit()
+
         try:
             loaded = await load_participants_for_course(db, course, reunion)
             if loaded:
@@ -657,7 +696,6 @@ async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: in
                     course.libelle, reunion.date_str, reunion.num_officiel, course.num_externe,
                 )
             else:
-                # participants_loaded était déjà True ou aucun participant retourné par l'API
                 succes += 1
                 logger.debug(
                     "[BACKFILL] déjà chargé ou API vide — course %d (%s)",
@@ -669,8 +707,8 @@ async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: in
                 "[BACKFILL] ECHEC course %d (%s) : %s",
                 course.id, course.libelle, e,
             )
-        # Throttle pour ne pas saturer l'API PMU
-        await asyncio.sleep(0.3)
+        # Throttle réduit : 0.1s au lieu de 0.3s pour finir dans le délai Render free tier
+        await asyncio.sleep(0.1)
 
     logger.info(
         "[BACKFILL] Terminé — %d traité(es), %d succès, %d échec(s)",

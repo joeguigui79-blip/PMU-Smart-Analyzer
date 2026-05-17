@@ -115,7 +115,7 @@ PARIS_ALIASES: dict[str, list[str]] = {
     "PLACE_1":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "PLACE_2":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
     "PLACE_3":          ["SIMPLE_PLACE", "E_SIMPLE_PLACE", "PLACE", "place"],
-    "COUPLE_GAGNANT":   ["COUPLE_GAGNANT", "E_COUPLE_GAGNANT", "couple_gagnant", "COUPLE", "couple"],
+    "COUPLE_GAGNANT":   ["COUPLE_GAGNANT", "E_COUPLE_GAGNANT", "couple_gagnant", "COUPLE", "couple", "COUPLE_ORDRE_INTERNATIONAL", "E_COUPLE_ORDRE_INTERNATIONAL"],
     "COUPLE_PLACE_12":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     "COUPLE_PLACE_23":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
     "COUPLE_PLACE_13":  ["COUPLE_PLACE", "E_COUPLE_PLACE", "couple_place"],
