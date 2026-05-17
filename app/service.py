@@ -1,6 +1,7 @@
 """
 Service layer : chargement et mise à jour des données PMU en base.
 """
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -606,3 +607,73 @@ async def recuperer_arrivees_manquantes(db: AsyncSession) -> int:
         logger.info("recuperer_arrivees_manquantes : %d arrivée(s) récupérée(s)", recovered)
 
     return recovered
+
+
+async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: int = 7) -> dict:
+    """
+    Charge les participants manquants pour toutes les courses TERMINE des N derniers jours
+    dont nb_part=0 (participants jamais chargés).
+
+    Throttle : 0.3s entre chaque appel API pour ne pas saturer l'API PMU non officielle.
+    Retourne un dict avec les compteurs : courses_traitees, succes, echecs.
+    """
+    from app.config import PARIS_TZ
+
+    now = datetime.now(PARIS_TZ)
+    # Construire la liste des date_str DDMMYYYY des N derniers jours (sans aujourd'hui,
+    # qui est déjà couvert par load_programme_today + recuperer_arrivees_manquantes)
+    date_strs = []
+    for delta in range(0, jours + 1):
+        d = now - timedelta(days=delta)
+        date_strs.append(d.strftime("%d%m%Y"))
+
+    logger.info("[BACKFILL] Démarrage backfill participants — %d derniers jours (%s)", jours, ", ".join(date_strs))
+
+    # Requête : courses TERMINE avec participants_loaded=False dans la fenêtre
+    result = await db.execute(
+        select(Course, Reunion)
+        .join(Reunion, Course.reunion_id == Reunion.id)
+        .where(
+            Course.statut_resultat == "TERMINE",
+            Course.participants_loaded == False,  # noqa: E712
+            Reunion.date_str.in_(date_strs),
+        )
+    )
+    rows = result.all()
+
+    total = len(rows)
+    succes = 0
+    echecs = 0
+
+    logger.info("[BACKFILL] %d course(s) TERMINE avec participants_loaded=False trouvées", total)
+
+    for course, reunion in rows:
+        try:
+            loaded = await load_participants_for_course(db, course, reunion)
+            if loaded:
+                succes += 1
+                logger.info(
+                    "[BACKFILL] OK — %s (%s R%s C%s)",
+                    course.libelle, reunion.date_str, reunion.num_officiel, course.num_externe,
+                )
+            else:
+                # participants_loaded était déjà True ou aucun participant retourné par l'API
+                succes += 1
+                logger.debug(
+                    "[BACKFILL] déjà chargé ou API vide — course %d (%s)",
+                    course.id, course.libelle,
+                )
+        except Exception as e:
+            echecs += 1
+            logger.warning(
+                "[BACKFILL] ECHEC course %d (%s) : %s",
+                course.id, course.libelle, e,
+            )
+        # Throttle pour ne pas saturer l'API PMU
+        await asyncio.sleep(0.3)
+
+    logger.info(
+        "[BACKFILL] Terminé — %d traité(es), %d succès, %d échec(s)",
+        total, succes, echecs,
+    )
+    return {"courses_traitees": total, "succes": succes, "echecs": echecs}

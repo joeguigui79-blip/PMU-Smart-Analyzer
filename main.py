@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -50,6 +51,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Erreur lors de l'optimisation au démarrage : %s", e)
 
+    # Backfill participants en arrière-plan (ne bloque pas le démarrage)
+    async def _run_startup_backfill():
+        try:
+            from app.database import AsyncSessionLocal as _ASL
+            from app.service import backfill_participants_pour_courses_termine
+            logger.info("[STARTUP] Backfill participants en arrière-plan (7 derniers jours)…")
+            async with _ASL() as db_bf:
+                stats = await backfill_participants_pour_courses_termine(db_bf, jours=7)
+            logger.info(
+                "[STARTUP] Backfill terminé — %d traité(es), %d succès, %d échec(s)",
+                stats["courses_traitees"], stats["succes"], stats["echecs"],
+            )
+        except Exception as exc:
+            logger.warning("[STARTUP] Erreur backfill participants : %s", exc)
+
+    asyncio.create_task(_run_startup_backfill())
+
     yield
     from app.pmu_client import pmu_client
     await pmu_client.close()
@@ -96,6 +114,9 @@ app.include_router(pronostics_router.router)
 
 from app.routers import couple_jockey as couple_jockey_router
 app.include_router(couple_jockey_router.router)
+
+from app.routers import admin_router
+app.include_router(admin_router.router)
 
 # ---- Endpoint de gestion du cache ----
 from app.cache import cache as _cache
