@@ -113,8 +113,6 @@ const API = {
   // ---- Stats avancées + Calibration ----
   statsScoring:     function () { return cachedFetch("/api/stats/scoring"); },
   statsCalibration: function () { return cachedFetch("/api/stats/calibration"); },
-  calibrateStart:   function () { return apiFetch("/api/calibrate", { method: "POST" }); },
-  calibrateStatus:  function (jobId) { return apiFetch("/api/calibrate/status/" + jobId); },
 
   // ---- Bilan backtesting ----
   bilan: function (periode, discipline) { return cachedFetch("/api/bilan?periode=" + (periode || "all") + "&discipline=" + (discipline || "all")); },

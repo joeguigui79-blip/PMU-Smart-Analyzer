@@ -967,25 +967,6 @@ body {
   color: var(--text-muted);
   margin-bottom: 10px;
 }
-.btn-calibrate {
-  background: var(--green);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-.btn-calibrate:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.btn-calibrate:not(:disabled):active {
-  opacity: 0.8;
-}
-
 /* Résumé global (3 cards en ligne) */
 .stats-summary-row {
   display: flex;

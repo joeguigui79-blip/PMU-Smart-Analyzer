@@ -4,34 +4,23 @@ Router Stats avancées + Calibration.
 Endpoints :
   GET  /api/stats/scoring            — Taux de réussite Expert vs Auto vs Sans-cote par discipline
   GET  /api/stats/calibration        — Poids auto-calibrés actuels + date dernière calibration
-  POST /api/calibrate                — Lance calibration en background, renvoie {job_id, status}
-  GET  /api/calibrate/status/{job_id} — Polling: {status, progress, result, error}
 """
-import asyncio
 import logging
-import uuid
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db, AsyncSessionLocal
-from app.models import Participant, Course, CalibrationWeight, Reunion
+from app.database import get_db
+from app.models import Course, CalibrationWeight, Reunion
 from app.scoring import _normalize_discipline
 from app.config import SCORING_WEIGHTS_DISCIPLINE
-from app.calibration import calibrate_and_store, get_calibration_status, MIN_COURSES_PAR_DISCIPLINE, MIN_COURSES_DEFAULT
+from app.calibration import get_calibration_status, MIN_COURSES_PAR_DISCIPLINE, MIN_COURSES_DEFAULT
 from app.service import refresh_programme_statuts
 from app.cache import cache, TTL_STATS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["stats"])
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Stockage en mémoire des jobs de calibration (TTL implicite : redémarrage serveur)
-# ─────────────────────────────────────────────────────────────────────────────
-_calibration_jobs: dict[str, dict] = {}
-# Format : { job_id: { status: "running"|"done"|"error", progress: int, result: dict|None, error: str|None } }
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper partagé : taux top-1 par discipline pour les 3 modes
@@ -344,68 +333,3 @@ async def stats_calibration(nocache: int = Query(default=0), db: AsyncSession = 
     cache.set(cache_key, calib_response, ttl=TTL_STATS)
     logger.debug("Cache SET: %s (TTL=%ds)", cache_key, TTL_STATS)
     return calib_response
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# POST /api/calibrate  — démarre la calibration en background
-# ─────────────────────────────────────────────────────────────────────────────
-
-async def _run_calibration_job(job_id: str) -> None:
-    """Tâche background : exécute calibrate_and_store et met à jour _calibration_jobs."""
-    job = _calibration_jobs[job_id]
-    job["progress"] = 10
-    try:
-        async with AsyncSessionLocal() as db:
-            job["progress"] = 30
-            result = await calibrate_and_store(db)
-            job["progress"] = 100
-            job["status"] = "done"
-            job["result"] = result
-            logger.info("Calibration job %s terminé : %s", job_id, result)
-            # Invalider le cache stats pour forcer un rechargement
-            cache.delete("stats:scoring")
-            cache.delete("stats:calibration")
-    except Exception as exc:
-        job["status"] = "error"
-        job["error"] = str(exc)
-        logger.exception("Calibration job %s échoué", job_id)
-
-
-@router.post("/api/calibrate")
-async def force_calibrate(background_tasks: BackgroundTasks):
-    """
-    Lance la calibration en tâche de fond et retourne immédiatement un job_id.
-    Le client doit poller GET /api/calibrate/status/{job_id}.
-    """
-    job_id = str(uuid.uuid4())
-    _calibration_jobs[job_id] = {
-        "status": "running",
-        "progress": 0,
-        "result": None,
-        "error": None,
-    }
-    background_tasks.add_task(_run_calibration_job, job_id)
-    logger.info("Calibration job %s démarré", job_id)
-    return {"job_id": job_id, "status": "running"}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GET /api/calibrate/status/{job_id} — polling du statut
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/api/calibrate/status/{job_id}")
-async def calibrate_status(job_id: str):
-    """
-    Retourne le statut courant du job de calibration.
-    { status: running|done|error, progress: 0-100, result: {...}|None, error: str|None }
-    """
-    job = _calibration_jobs.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job introuvable (redémarrage serveur ?)")
-    return {
-        "job_id": job_id,
-        "status": job["status"],
-        "progress": job["progress"],
-        "result": job.get("result"),
-        "error": job.get("error"),
-    }
