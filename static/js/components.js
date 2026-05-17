@@ -2,6 +2,19 @@
 (function () {
   "use strict";
 
+  /**
+   * Parse une chaîne ISO datetime en Date, en forçant l'interprétation UTC
+   * si aucun indicateur de timezone n'est présent (datetime naïf depuis la DB).
+   * Logs temporaires pour diagnostic re-bug.
+   */
+  function parseUtc(iso) {
+    if (!iso) return null;
+    var hasTz = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(iso);
+    var adjusted = hasTz ? iso : iso + "Z";
+    console.log("[parseUtc] input=" + iso + " → adjusted=" + adjusted);
+    return new Date(adjusted);
+  }
+
   function scoreClass(score) {
     if (score >= 70) return "high";
     if (score >= 50) return "medium";
@@ -148,6 +161,7 @@
   }
 
   window.Components = {
+    parseUtc,
     scoreClass, formatTime, formatCote, disciplineClass, disciplineLabel,
     musiqueParse, renderMusiqueHtml, renderScoreBar, renderParticipantRow,
     renderCourseCard, skeletonCards,

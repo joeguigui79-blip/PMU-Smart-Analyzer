@@ -1466,7 +1466,8 @@ function renderStatsPage(scoringData, calibData) {
   html += '<div class="stats-summary-card"><div class="ssc-value ' + modeActifCls + '">' + modeActifLabel + '</div><div class="ssc-label">Mode actif global</div></div>';
 
   if (calibData && calibData.last_updated_global) {
-    var dt = new Date(calibData.last_updated_global);
+    var dt = H().parseUtc(calibData.last_updated_global);
+    console.log("[CALIB] last_updated_global brut='" + calibData.last_updated_global + "' → Date=" + (dt ? dt.toISOString() : "null"));
     var dtStr = dt.toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
     html += '<div class="stats-summary-card"><div class="ssc-value ssc-small">' + dtStr + '</div><div class="ssc-label">Dernière calibration</div></div>';
   } else {
@@ -1559,7 +1560,8 @@ function renderStatsPage(scoringData, calibData) {
       html += '<div class="weights-card">';
       html += '<div class="weights-card-title">' + disc;
       if (calD.last_updated) {
-        var d2 = new Date(calD.last_updated);
+        var d2 = H().parseUtc(calD.last_updated);
+        console.log("[CALIB] last_updated brut='" + calD.last_updated + "' → Date=" + (d2 ? d2.toISOString() : "null"));
         html += ' <span class="weights-date">MAJ: ' + d2.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }) + "</span>";
       }
       html += "</div>";

@@ -18,6 +18,19 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+def to_utc_iso(dt) -> str | None:
+    """Sérialise un datetime en ISO 8601 avec suffixe Z (UTC explicite).
+    Traite les datetime naïfs comme UTC (cas colonnes TIMESTAMP WITHOUT TIME ZONE en DB).
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 from sqlalchemy import select
 
 from app.models import Participant, Course, CalibrationWeight
@@ -283,7 +296,7 @@ async def calibrate_and_store(db: AsyncSession) -> dict:
         "success": True,
         "disciplines_calibrated": updated,
         "fallback_disciplines": fallback,
-        "updated_at": now.isoformat(),
+        "updated_at": to_utc_iso(now),
     }
 
 
@@ -338,9 +351,9 @@ async def get_calibration_status(db: AsyncSession) -> dict:
         "disciplines": {
             d: {
                 "poids": v["criteres"],
-                "last_updated": v["last_updated"].isoformat() if v["last_updated"] else None,
+                "last_updated": to_utc_iso(v["last_updated"]),
             }
             for d, v in by_disc.items()
         },
-        "last_updated": last_updated_global.isoformat() if last_updated_global else None,
+        "last_updated": to_utc_iso(last_updated_global),
     }
