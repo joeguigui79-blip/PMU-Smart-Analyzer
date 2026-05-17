@@ -1411,7 +1411,8 @@ function _rateBadge(rate) {
 }
 
 function _progressBar(value, max) {
-  var pct = Math.min(100, Math.round((value / max) * 100));
+  var safeMax = (max && max > 0) ? max : 1;
+  var pct = Math.min(100, Math.round((value / safeMax) * 100));
   return (
     '<div class="prog-bar-wrap">' +
     '<div class="prog-bar" style="width:' + pct + '%"></div>' +
@@ -1516,7 +1517,9 @@ function renderStatsPage(scoringData, calibData) {
       html += "</div>";
 
       if (!d.has_auto_data) {
-        var minC = (scoringData.min_courses_required || 10);
+        var minCDict = scoringData.min_courses_required;
+        var minC = (calD.min_courses_required) ||
+                   (minCDict && typeof minCDict === "object" ? (minCDict[disc] || 20) : (minCDict || 20));
         html += '<div class="disc-progress-msg">Calibration auto disponible après ' + minC + ' courses. ';
         html += _progressBar(d.nb_courses, minC);
         html += "</div>";
@@ -1605,18 +1608,53 @@ async function doCalibrate() {
   var btn = document.querySelector(".btn-calibrate");
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Calibration en cours…";
+    btn.textContent = "Calibration en cours… 0%";
   }
+
+  var jobId = null;
+
   try {
-    var result = await API.calibrate();
-    var msg = "Calibration terminée. Disciplines calibrées: " +
-      ((result.disciplines_calibrated || []).join(", ") || "aucune");
-    showToast(msg);
-    // Invalider le cache stats et recharger
-    _invalidatePage("stats");
-    loadStatsPage();
+    // Lance la calibration en background — retour immédiat avec job_id
+    var startRes = await API.calibrateStart();
+    jobId = startRes && startRes.job_id;
+    if (!jobId) throw new Error("Réponse inattendue du serveur (pas de job_id)");
+
+    // Polling : toutes les 3s, max 10 min (200 tentatives)
+    var MAX_POLLS = 200;
+    var POLL_INTERVAL_MS = 3000;
+
+    for (var attempt = 0; attempt < MAX_POLLS; attempt++) {
+      await new Promise(function (resolve) { setTimeout(resolve, POLL_INTERVAL_MS); });
+
+      var statusRes = await API.calibrateStatus(jobId);
+
+      // Mise à jour du bouton avec la progression
+      if (btn) {
+        btn.textContent = "Calibration en cours… " + (statusRes.progress || 0) + "%";
+      }
+
+      if (statusRes.status === "done") {
+        var result = statusRes.result || {};
+        var msg = "Calibration terminée. Disciplines calibrées: " +
+          ((result.disciplines_calibrated || []).join(", ") || "aucune");
+        showToast(msg);
+        _invalidatePage("stats");
+        loadStatsPage();
+        return;
+      }
+
+      if (statusRes.status === "error") {
+        throw new Error(statusRes.error || "Erreur inconnue");
+      }
+      // status === "running" → continuer le polling
+    }
+
+    // Délai dépassé côté polling (10 min)
+    throw new Error("Timeout : la calibration prend trop de temps. Vérifiez les logs serveur.");
+
   } catch (e) {
     showToast("Erreur lors de la calibration: " + (e.message || ""), true);
+  } finally {
     if (btn) {
       btn.disabled = false;
       btn.textContent = "Recalibrer maintenant";
