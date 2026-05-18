@@ -301,8 +301,12 @@ async def load_participants_for_course(db: AsyncSession, course: Course, reunion
     )
 
     if not participants_data:
-        course.participants_loaded = True
-        await db.commit()
+        # Ne PAS marquer loaded=True : l'API PMU a retourné vide (transitoire).
+        # Laisser participants_loaded=False pour permettre un retry futur (backfill ou startup).
+        logger.warning(
+            "[LOAD_PARTICIPANTS] API vide pour course %d (%s) — participants_loaded reste False pour retry ultérieur",
+            course.id, getattr(course, 'libelle', ''),
+        )
         return False
 
     # Charger les poids depuis DB (par discipline)
@@ -623,6 +627,7 @@ async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: in
     """
     from app.config import PARIS_TZ
     from sqlalchemy import func, exists
+    from app.models import Participant as _Backfill_P
 
     now = datetime.now(PARIS_TZ)
     date_strs = []
@@ -645,10 +650,9 @@ async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: in
     rows_not_loaded = result1.all()
 
     # Cas 2 : marquées chargées MAIS 0 participant en DB (API PMU vide au 1er passage)
-    from app.models import Participant as _Participant
     subq_has_part = (
-        select(_Participant.id)
-        .where(_Participant.course_id == Course.id)
+        select(_Backfill_P.id)
+        .where(_Backfill_P.course_id == Course.id)
         .limit(1)
         .correlate(Course)
     )
@@ -675,43 +679,94 @@ async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: in
     total = len(rows)
     succes = 0
     echecs = 0
+    # Courses qui ont échoué au 1er passage (pour 2e retry)
+    failed_first_pass: list = []
 
     logger.info(
         "[BACKFILL] %d course(s) à traiter — %d jamais tentées, %d marquées chargées mais vides",
         total, len(rows_not_loaded), len(rows_loaded_empty),
     )
 
+    # ── Passage 1 ────────────────────────────────────────────────────────────
+    loaded_empty_ids = {r[0].id for r in rows_loaded_empty}
     for course, reunion in rows:
         # Réinitialiser le flag pour forcer le re-chargement des courses vides
-        if course.participants_loaded and course.id in {r[0].id for r in rows_loaded_empty}:
+        if course.participants_loaded and course.id in loaded_empty_ids:
             course.participants_loaded = False
             await db.commit()
 
         try:
             loaded = await load_participants_for_course(db, course, reunion)
-            if loaded:
+            # Vérifier si des participants ont vraiment été insérés
+            p_check = await db.execute(
+                select(_Backfill_P.id).where(_Backfill_P.course_id == course.id).limit(1)
+            )
+            has_participants = p_check.scalar_one_or_none() is not None
+
+            if has_participants:
                 succes += 1
                 logger.info(
-                    "[BACKFILL] OK — %s (%s R%s C%s)",
-                    course.libelle, reunion.date_str, reunion.num_officiel, course.num_externe,
+                    "[BACKFILL] SUCCES (pass 1) — course %d %s (%s R%s C%s)",
+                    course.id, course.libelle, reunion.date_str, reunion.num_officiel, course.num_externe,
                 )
             else:
-                succes += 1
-                logger.debug(
-                    "[BACKFILL] déjà chargé ou API vide — course %d (%s)",
-                    course.id, course.libelle,
+                # API vide au 1er passage → planifier retry
+                failed_first_pass.append((course, reunion))
+                logger.warning(
+                    "[BACKFILL] API vide (pass 1) — course %d %s (%s R%s C%s) → retry planifié",
+                    course.id, course.libelle, reunion.date_str, reunion.num_officiel, course.num_externe,
                 )
         except Exception as e:
             echecs += 1
             logger.warning(
-                "[BACKFILL] ECHEC course %d (%s) : %s",
+                "[BACKFILL] ECHEC (pass 1) course %d (%s) : %s",
                 course.id, course.libelle, e,
             )
-        # Throttle réduit : 0.1s au lieu de 0.3s pour finir dans le délai Render free tier
+        # Throttle : 0.1s entre chaque appel API
         await asyncio.sleep(0.1)
 
+    # ── Passage 2 (retry uniquement les cours ayant échoué au pass 1) ────────
+    if failed_first_pass:
+        logger.info(
+            "[BACKFILL] Passage 2 — retry sur %d course(s) ayant eu API vide au pass 1",
+            len(failed_first_pass),
+        )
+        await asyncio.sleep(2.0)  # Petite pause avant le 2e passage
+
+        for course, reunion in failed_first_pass:
+            # S'assurer que le flag permet le rechargement
+            if course.participants_loaded:
+                course.participants_loaded = False
+                await db.commit()
+            try:
+                await load_participants_for_course(db, course, reunion)
+                p_check2 = await db.execute(
+                    select(_Backfill_P.id).where(_Backfill_P.course_id == course.id).limit(1)
+                )
+                has_participants2 = p_check2.scalar_one_or_none() is not None
+
+                if has_participants2:
+                    succes += 1
+                    logger.info(
+                        "[BACKFILL] SUCCES (pass 2) — course %d %s (%s R%s C%s)",
+                        course.id, course.libelle, reunion.date_str, reunion.num_officiel, course.num_externe,
+                    )
+                else:
+                    echecs += 1
+                    logger.warning(
+                        "[BACKFILL] ECHEC définitif (pass 2) — course %d %s (%s R%s C%s) — API toujours vide",
+                        course.id, course.libelle, reunion.date_str, reunion.num_officiel, course.num_externe,
+                    )
+            except Exception as e:
+                echecs += 1
+                logger.warning(
+                    "[BACKFILL] ECHEC (pass 2) course %d (%s) : %s",
+                    course.id, course.libelle, e,
+                )
+            await asyncio.sleep(0.1)
+
     logger.info(
-        "[BACKFILL] Terminé — %d traité(es), %d succès, %d échec(s)",
-        total, succes, echecs,
+        "[BACKFILL] Terminé — %d traité(es), %d succès, %d échec(s) (dont %d retry pass 2)",
+        total, succes, echecs, len(failed_first_pass),
     )
     return {"courses_traitees": total, "succes": succes, "echecs": echecs}
