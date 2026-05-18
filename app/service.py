@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from app.models import Reunion, Course, Participant, Bet, ScoringWeight
 from app.pmu_client import pmu_client
+from app.cache import cache
 from app.scoring import (
     calculer_scores,
     load_weights_from_config_or_db,
@@ -423,6 +424,14 @@ async def fetch_and_store_arrivee(db: AsyncSession, course_id: int) -> bool:
     course.statut_resultat = "TERMINE"
     await db.commit()
 
+    # Invalider le cache bilan (toutes périodes/disciplines) car une arrivée vient d'être ajoutée
+    invalidated = cache.delete_prefix("bilan:")
+    if invalidated:
+        logger.info(
+            "[CACHE] %d entrée(s) bilan invalidée(s) après arrivée course %d",
+            invalidated, course_id,
+        )
+
     # Évaluer les paris liés à cette course
     await evaluer_paris_pour_course(db, course_id)
 
@@ -769,4 +778,13 @@ async def backfill_participants_pour_courses_termine(db: AsyncSession, jours: in
         "[BACKFILL] Terminé — %d traité(es), %d succès, %d échec(s) (dont %d retry pass 2)",
         total, succes, echecs, len(failed_first_pass),
     )
+
+    # Invalider le cache bilan si des participants ont été chargés
+    if succes > 0:
+        invalidated = cache.delete_prefix("bilan:")
+        logger.info(
+            "[BACKFILL] Cache bilan invalidé (%d entrée(s)) après chargement de %d course(s)",
+            invalidated, succes,
+        )
+
     return {"courses_traitees": total, "succes": succes, "echecs": echecs}

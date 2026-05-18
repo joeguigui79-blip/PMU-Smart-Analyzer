@@ -76,6 +76,7 @@ async def refresh_programme_data(db: AsyncSession = Depends(get_db)):
     cache.delete_prefix(f"courses:{date_str}")
     cache.delete_prefix(f"dashboard:{date_str}")
     cache.delete_prefix(f"pronostics:{date_str}")
+    cache.delete_prefix("bilan:")
     return {"success": True, "loaded": loaded, "date": date_str}
 
 
@@ -273,6 +274,7 @@ async def refresh_programme(db: AsyncSession = Depends(get_db)):
     cache.delete_prefix(f"courses:{date_str}")
     cache.delete_prefix(f"dashboard:{date_str}")
     cache.delete_prefix(f"pronostics:{date_str}")
+    cache.delete_prefix("bilan:")
 
     return {"success": True, "loaded": True, "date": date_str, "arrivees_recuperees": arrivees_recuperees}
 
